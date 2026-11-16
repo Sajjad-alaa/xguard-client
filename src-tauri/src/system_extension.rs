@@ -20,7 +20,7 @@ static DELEGATE: LazyLock<Mutex<Option<Retained<SystemExtensionDelegate>>>> =
 
 define_class!(
     #[unsafe(super(NSObject))]
-    #[name = "DefguardSystemExtensionDelegate"]
+    #[name = "XGuardSystemExtensionDelegate"]
     struct SystemExtensionDelegate;
 
     unsafe impl NSObjectProtocol for SystemExtensionDelegate {}

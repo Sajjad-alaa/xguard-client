@@ -68,7 +68,7 @@ export const ConnectModalMfaMobile = () => {
     <div id="mfa-mobile-view">
       <p className="view-description">
         {screen === 'loading' && 'Preparing authentication...'}
-        {screen === 'qr' && 'Open your Defguard mobile app and scan the QR code below.'}
+        {screen === 'qr' && 'Open your XGuard mobile app and scan the QR code below.'}
         {screen === 'error' && <span className="error">{errorMessage}</span>}
       </p>
       {screen === 'qr' && qrValue && (

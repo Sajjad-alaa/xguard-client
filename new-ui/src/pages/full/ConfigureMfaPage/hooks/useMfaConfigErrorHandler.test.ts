@@ -42,7 +42,7 @@ describe('useMfaConfigErrorHandler', () => {
       visible: true,
       title: 'MFA configuration error',
       content:
-        'Email MFA is unavailable because SMTP is not configured on this Defguard instance. Contact your administrator.',
+        'Email MFA is unavailable because SMTP is not configured on this XGuard instance. Contact your administrator.',
       cancelProps: { text: 'Got it', variant: ButtonVariant.Primary },
       submitProps: null,
     });

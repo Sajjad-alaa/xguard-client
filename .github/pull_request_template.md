@@ -1,6 +1,6 @@
 ## 📝 New contributors 
 
-- [ ] I have read, understand, and agree to the Contributor Agreement. By checking this box, I confirm I have the right to contribute this work and I grant Defguard sp. z o.o. the necessary rights to use my contribution as outlined in the full agreement.: https://tnt.sh/s/defguard-contribution-agreement
+- [ ] I have read, understand, and agree to the Contributor Agreement. By checking this box, I confirm I have the right to contribute this work and I grant XGuard sp. z o.o. the necessary rights to use my contribution as outlined in the full agreement.: https://tnt.sh/s/xguard-contribution-agreement
 
 ⚠︎ If the checkbox will not be confirmed - we can't include your contribution in our codebase.
 
@@ -13,7 +13,7 @@
 
 #### Documentation ###
 
-- [ ] If testing requires changes in the environment or deployment, please **update the documentation** (https://docs.defguard.net) first and **attach the link to the documentation** section in this pull request
+- [ ] If testing requires changes in the environment or deployment, please **update the documentation** (https://docs.xguard.local) first and **attach the link to the documentation** section in this pull request
 - [ ] I have commented on my code, particularly in hard-to-understand areas
 
 #### Testing ###

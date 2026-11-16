@@ -21,7 +21,7 @@ param(
     [string]$EnrollmentTokenExpirationTime
 )
 
-# Function to make authenticated API calls to Defguard
+# Function to make authenticated API calls to XGuard
 function Invoke-AuthenticatedRestMethod {
     param(
         [string]$Method,
@@ -47,7 +47,7 @@ function Invoke-AuthenticatedRestMethod {
         return $response
     }
     catch {
-        Write-Error "Defguard API call failed: $($_.Exception.Message)"
+        Write-Error "XGuard API call failed: $($_.Exception.Message)"
         return $null
     }
 }
@@ -133,7 +133,7 @@ if ($ADUsername) {
 }
 
 # Get group members
-Write-Host "Fetching group members from Defguard..." -ForegroundColor Yellow
+Write-Host "Fetching group members from XGuard..." -ForegroundColor Yellow
 $groupEndpoint = "api/v1/group/$GroupName"
 $groupResponse = Invoke-AuthenticatedRestMethod -Method "GET" -Endpoint $groupEndpoint
 

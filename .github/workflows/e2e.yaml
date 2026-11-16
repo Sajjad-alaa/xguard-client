@@ -25,12 +25,12 @@ jobs:
       options: --privileged
     env:
       DEBIAN_FRONTEND: noninteractive
-      CLIENT_BINARY: ${{ github.workspace }}/src-tauri/target/release/defguard-client
+      CLIENT_BINARY: ${{ github.workspace }}/src-tauri/target/release/xguard-client
       NATIVE_DRIVER: /usr/bin/WebKitWebDriver
       SQLX_OFFLINE: '1'
       RUSTC_WRAPPER: sccache
       SCCACHE_GHA_ENABLED: 'true'
-      DEFGUARD_CLIENT_WELCOME_SKIP: '1'
+      XGUARD_CLIENT_WELCOME_SKIP: '1'
       # Fix for: repository path is not owned by current user.
       VERGEN_GIT_SHA: 'e2e'
       VERGEN_IDEMPOTENT: '1'
@@ -92,13 +92,13 @@ jobs:
           printf '#!/bin/sh\ncat >/dev/null 2>&1 || true\nexit 0\n' > /usr/local/sbin/resolvectl
           chmod +x /usr/local/sbin/resolvectl
 
-      - name: Start defguard-service
+      - name: Start xguard-service
         run: |
-          /usr/sbin/groupadd -f defguard
+          /usr/sbin/groupadd -f xguard
           /usr/sbin/modprobe wireguard || true
-          setsid src-tauri/target/release/defguard-service < /dev/null &
-          for _ in $(seq 1 40); do [ -S /var/run/defguard.socket ] && break; sleep 0.5; done
-          test -S /var/run/defguard.socket
+          setsid src-tauri/target/release/xguard-service < /dev/null &
+          for _ in $(seq 1 40); do [ -S /var/run/xguard.socket ] && break; sleep 0.5; done
+          test -S /var/run/xguard.socket
 
       - name: Install e2e dependencies
         run: pnpm install --no-frozen-lockfile
@@ -116,7 +116,7 @@ jobs:
         if: always()
         run: |
           mkdir -p e2e-logs/client
-          cp -r /var/log/defguard-service e2e-logs/service-logs || true
+          cp -r /var/log/xguard-service e2e-logs/service-logs || true
 
       - name: Upload logs
         if: always()
@@ -129,7 +129,7 @@ jobs:
 
   lint-e2e:
     runs-on:
-      - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
+      - codebuild-xguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 

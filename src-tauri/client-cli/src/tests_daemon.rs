@@ -11,12 +11,12 @@ use std::{
     time::Duration,
 };
 
-use defguard_client_proto::defguard::client::v1::{
+use xguard_client_proto::xguard::client::v1::{
     desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
     CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData, ManagedInterfaceData,
     Peer, ReadInterfaceDataRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
 };
-use defguard_core::{
+use xguard_core::{
     connection::active_state::active_state,
     database::{
         models::{
@@ -137,7 +137,7 @@ fn spawn_mock() -> (MockDaemonState, JoinHandle<()>, TempDir) {
         state: state.clone(),
     };
     let dir = tempdir().unwrap();
-    let socket_path = dir.path().join("defguard.sock");
+    let socket_path = dir.path().join("xguard.sock");
     let _ = remove_file(&socket_path);
     let uds = UnixListener::bind(&socket_path).unwrap();
     let handle = tokio::spawn(async move {
@@ -148,7 +148,7 @@ fn spawn_mock() -> (MockDaemonState, JoinHandle<()>, TempDir) {
             .await
             .ok();
     });
-    set_var("DEFGUARD_DAEMON_SOCKET", socket_path.to_str().unwrap());
+    set_var("XGUARD_DAEMON_SOCKET", socket_path.to_str().unwrap());
     // Poll until the socket accepts connections instead of sleeping a fixed amount.
     for _ in 0..READY_POLL_ATTEMPTS {
         if UnixStream::connect(&socket_path).is_ok() {

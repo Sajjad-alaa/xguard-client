@@ -1,6 +1,6 @@
 [package]
-name = "defguard-client-proto"
-description = "Protobuf definitions for the Defguard desktop client"
+name = "xguard-client-proto"
+description = "Protobuf definitions for the XGuard desktop client"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -12,7 +12,7 @@ version.workspace = true
 tonic-prost-build.workspace = true
 
 [dependencies]
-defguard_wireguard_rs.workspace = true
+xguard_wireguard_rs.workspace = true
 prost.workspace = true
 serde.workspace = true
 serde_with.workspace = true

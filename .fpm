@@ -1,5 +1,5 @@
 -s dir
 --name dg
---description "defguard CLI client"
---url "https://defguard.net/"
+--description "xguard CLI client"
+--url "https://xguard.local/"
 --maintainer "teonite"

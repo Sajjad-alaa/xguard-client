@@ -2,17 +2,17 @@ use std::{collections::HashMap, fmt, fs, path::Path, time::SystemTime};
 #[cfg(any(windows, target_os = "linux", test))]
 use std::{ffi::OsStr, path::PathBuf};
 
-use defguard_client_core::{
+use xguard_client_core::{
     database::models::{
         location::{Location, ServiceLocationMode},
         Id,
     },
     error::Error as CoreError,
 };
-use defguard_client_proto::defguard::client::v1::{
+use xguard_client_proto::xguard::client::v1::{
     SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode as ProtoServiceLocationMode,
 };
-use defguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
+use xguard_wireguard_rs::{error::WireguardInterfaceError, WGApi};
 #[cfg(any(windows, target_os = "linux"))]
 use log::debug;
 use log::warn;
@@ -44,7 +44,7 @@ pub enum ServiceLocationError {
     #[error(transparent)]
     WireGuardError(#[from] WireguardInterfaceError),
     #[error(transparent)]
-    AddrParseError(#[from] defguard_wireguard_rs::net::IpAddrParseError),
+    AddrParseError(#[from] xguard_wireguard_rs::net::IpAddrParseError),
     #[error("WireGuard interface error: {0}")]
     InterfaceError(String),
     #[error(transparent)]
@@ -318,10 +318,10 @@ mod tests {
         let invalid = [
             "",
             "..",
-            "../../etc/defguard/evil",
+            "../../etc/xguard/evil",
             "..\\..\\Windows\\Temp\\evil",
             "C:\\Windows\\Temp\\evil",
-            "/etc/defguard/evil",
+            "/etc/xguard/evil",
             "0f8fad5b-d9cb-469f-a165-70867728950e/../evil",
             "0f8fad5b-d9cb-469f-a165-70867728950",
             "0f8fad5b-d9cb-469f-a165-70867728950eb",

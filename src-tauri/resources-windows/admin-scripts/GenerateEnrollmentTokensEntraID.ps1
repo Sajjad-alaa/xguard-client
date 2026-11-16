@@ -9,13 +9,13 @@ param(
     [string]$GroupName,
     
     [Parameter(Mandatory=$false)]
-    [string]$AttributeSetName = "Defguard",
+    [string]$AttributeSetName = "XGuard",
     
     [Parameter(Mandatory=$false)]
     [string]$EnrollmentTokenExpirationTime
 )
 
-# Function to make authenticated API calls to Defguard
+# Function to make authenticated API calls to XGuard
 function Invoke-AuthenticatedRestMethod {
     param(
         [string]$Method,
@@ -41,7 +41,7 @@ function Invoke-AuthenticatedRestMethod {
         return $response
     }
     catch {
-        Write-Error "Defguard API call failed: $($_.Exception.Message)"
+        Write-Error "XGuard API call failed: $($_.Exception.Message)"
         return $null
     }
 }
@@ -228,13 +228,13 @@ catch {
     exit 1                                                                                                                                  
 }                       
 
-# Get group members from Defguard
-Write-Host "Fetching group members from Defguard..." -ForegroundColor Yellow
+# Get group members from XGuard
+Write-Host "Fetching group members from XGuard..." -ForegroundColor Yellow
 $groupEndpoint = "api/v1/group/$GroupName"
 $groupResponse = Invoke-AuthenticatedRestMethod -Method "GET" -Endpoint $groupEndpoint
 
 if (-not $groupResponse) {
-    Write-Error "Failed to fetch group members from Defguard"
+    Write-Error "Failed to fetch group members from XGuard"
     exit 1
 }
 
@@ -256,7 +256,7 @@ $entraUpdateResults = @()
 foreach ($username in $usernames) {
     Write-Host "Processing user: $username" -ForegroundColor Cyan
     
-    # Get user details from Defguard to fetch email
+    # Get user details from XGuard to fetch email
     $userDetailsEndpoint = "api/v1/user/$username"
     $userDetailsResponse = Invoke-AuthenticatedRestMethod -Method "GET" -Endpoint $userDetailsEndpoint
     
@@ -277,7 +277,7 @@ foreach ($username in $usernames) {
     $userEmail = $userDetailsResponse.user.email
     Write-Host "  Found email: $userEmail" -ForegroundColor Green
     
-    # Generate enrollment token from Defguard using username
+    # Generate enrollment token from XGuard using username
     $enrollmentEndpoint = "api/v1/user/$username/start_enrollment"
     $requestBody = @{
         email = $null

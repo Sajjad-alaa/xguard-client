@@ -12,12 +12,12 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use defguard_client_core::error::Error as CoreError;
-use defguard_client_posture::{
+use xguard_client_core::error::Error as CoreError;
+use xguard_client_posture::{
     inspector::{device_posture_data, DiskEncryptionTarget},
     request_posture_authorization,
 };
-use defguard_client_proto::defguard::client::v1::ServiceLocation;
+use xguard_client_proto::xguard::client::v1::ServiceLocation;
 use futures_util::{stream, StreamExt};
 use log::{debug, error, info, warn};
 

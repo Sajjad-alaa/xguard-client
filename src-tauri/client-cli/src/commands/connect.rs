@@ -1,8 +1,8 @@
 use std::io::{stderr, stdin, IsTerminal};
 
-use defguard_client_posture::{authorize_posture_session, get_posture_data};
-use defguard_client_proto::defguard::client_types::MfaMethod;
-use defguard_core::{
+use xguard_client_posture::{authorize_posture_session, get_posture_data};
+use xguard_client_proto::xguard::client_types::MfaMethod;
+use xguard_core::{
     connection::{active_state::active_state, bring_up, ConnectionTarget},
     database::models::{instance::Instance, location::LocationMfaMethod, Id},
     ConnectionType,
@@ -148,7 +148,7 @@ pub async fn handle(
                     // to save the plan.
                     if interacted && !json {
                         eprintln!(
-                            "Save this plan with `defguard-client location set '{}' {}`.",
+                            "Save this plan with `xguard-client location set '{}' {}`.",
                             location.name,
                             plan.iter()
                                 .map(|method| format!(

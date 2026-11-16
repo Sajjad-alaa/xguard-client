@@ -46,7 +46,7 @@ jobs:
         with:
           scan-type: "fs"
           format: "spdx-json"
-          output: "defguard-client-${{ steps.vars.outputs.VERSION }}.sbom.json"
+          output: "xguard-client-${{ steps.vars.outputs.VERSION }}.sbom.json"
           scan-ref: "."
           severity: "CRITICAL,HIGH,MEDIUM,LOW"
           scanners: "vuln"
@@ -59,7 +59,7 @@ jobs:
         with:
           scan-type: "fs"
           format: "json"
-          output: "defguard-client-${{ steps.vars.outputs.VERSION }}.advisories.json"
+          output: "xguard-client-${{ steps.vars.outputs.VERSION }}.advisories.json"
           scan-ref: "."
           severity: "CRITICAL,HIGH,MEDIUM,LOW"
           scanners: "vuln"
@@ -70,6 +70,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ inputs.upload_url }}
-          asset_path: "defguard-*.json"
+          asset_path: "xguard-*.json"
           asset_content_type: application/octet-stream
           overwrite: true

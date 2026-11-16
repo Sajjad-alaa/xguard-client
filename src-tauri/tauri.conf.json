@@ -21,7 +21,7 @@
       "digestAlgorithm": "sha256",
       "timestampUrl": "http://time.certum.pl/",
       "wix": {
-        "upgradeCode": "923b21f5-7d3f-4f5e-8dcb-43fe1c65fb43",
+        "upgradeCode": "ce9f1855-fa79-44b6-8941-b09d083cf54d",
         "bannerPath": "./resources-windows/msi/top_banner.png",
         "dialogImagePath": "./resources-windows/msi/side_banner.png",
           "fragmentPaths": [
@@ -29,21 +29,21 @@
             "./resources-windows/fragments/provisioning.wxs"
           ],
           "componentRefs": [
-            "DefguardServiceFragment",
+            "XGuardServiceFragment",
             "ProvisioningScriptFragment"
           ],
         "template": "./resources-windows/msi/main.wxs"
       }
     },
     "resources": ["resources/icons/tray/*"],
-    "shortDescription": "Defguard desktop client",
-    "longDescription": "Defguard desktop client",
+    "shortDescription": "XGuard desktop client",
+    "longDescription": "XGuard desktop client",
     "linux": {
       "deb": {
         "files": {
           "/usr/bin/dg": "target/release/dg",
-          "/usr/sbin/defguard-service": "target/release/defguard-service",
-          "/usr/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service",
+          "/usr/sbin/xguard-service": "target/release/xguard-service",
+          "/usr/lib/systemd/system/xguard-service.service": "../resources-linux/xguard-service.service",
           "../control/rules": "../resources-linux/rules",
           "../control/postinst": "../resources-linux/postinst",
           "../control/prerm": "../resources-linux/prerm",
@@ -54,8 +54,8 @@
       "rpm": {
         "files": {
           "/usr/bin/dg": "target/release/dg",
-          "/usr/sbin/defguard-service": "target/release/defguard-service",
-          "/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service"
+          "/usr/sbin/xguard-service": "target/release/xguard-service",
+          "/lib/systemd/system/xguard-service.service": "../resources-linux/xguard-service.service"
         },
         "depends": ["desktop-file-utils"],
         "postInstallScript": "../resources-linux/postinst",
@@ -64,9 +64,9 @@
       }
     }
   },
-  "productName": "Defguard",
-  "mainBinaryName": "defguard-client",
-  "identifier": "net.defguard",
+  "productName": "XGuard",
+  "mainBinaryName": "xguard-client",
+  "identifier": "local.xguard",
   "version": "2.2.0",
   "app": {
     "security": {
@@ -78,7 +78,7 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["defguard"]
+        "schemes": ["xguard"]
       }
     }
   }

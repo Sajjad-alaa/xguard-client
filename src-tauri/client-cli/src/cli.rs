@@ -2,11 +2,11 @@ use clap::{Parser, Subcommand};
 
 use crate::mfa::method_parser;
 
-/// Command-line client for the Defguard VPN.
+/// Command-line client for the XGuard VPN.
 ///
 /// Shares the same database as the desktop client.
 #[derive(Parser)]
-#[command(name = "defguard-client", version, about)]
+#[command(name = "xguard-client", version, about)]
 pub struct Cli {
     /// Output machine-readable JSON instead of human-readable tables.
     #[arg(long, global = true)]
@@ -190,7 +190,7 @@ mod tests {
     use super::*;
 
     fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
-        Cli::try_parse_from(["defguard-client"].iter().chain(args))
+        Cli::try_parse_from(["xguard-client"].iter().chain(args))
     }
 
     #[test]

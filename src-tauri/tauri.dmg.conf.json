@@ -18,7 +18,7 @@
       "entitlements": "Installer.entitlements",
       "files": {
         "embedded.provisionprofile": "/Users/admin/Library/Developer/Xcode/UserData/Provisioning Profiles/fbbc4fe8-8738-432c-a647-484dee3f95bb.provisionprofile",
-        "Library/SystemExtensions/net.defguard.VPNExtension.systemextension": "../swift/extension/build/Installer/VPNSystemExtension.systemextension"
+        "Library/SystemExtensions/local.xguard.VPNExtension.systemextension": "../swift/extension/build/Installer/VPNSystemExtension.systemextension"
       }
     },
     "targets": ["dmg"]

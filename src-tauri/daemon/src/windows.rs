@@ -6,7 +6,7 @@ use std::{
 };
 
 use clap::Parser;
-use defguard_client_service_locations::{
+use xguard_client_service_locations::{
     reconciler::{run_reconciler, ReconcileSignal},
     windows::{watch_for_login_logoff, watch_for_network_change},
     ServiceLocationError, ServiceLocationManager,
@@ -29,7 +29,7 @@ use crate::{
     utils::logging_setup,
 };
 
-static SERVICE_NAME: &str = "DefguardService";
+static SERVICE_NAME: &str = "XGuardService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
 pub fn run() -> Result<(), windows_service::Error> {

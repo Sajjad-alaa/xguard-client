@@ -1,4 +1,4 @@
-//! Shared test helpers for defguard-client-core tests.
+//! Shared test helpers for xguard-client-core tests.
 //!
 //! Provides a controllable WebSocket stub for MFA mobile-approve tests,
 //! eliminating the need for Docker or external services.

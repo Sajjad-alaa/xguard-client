@@ -1,4 +1,4 @@
-//! Connect-time VPN MFA thin wrapper over `defguard_core::mfa`.
+//! Connect-time VPN MFA thin wrapper over `xguard_core::mfa`.
 //!
 //! Supports TOTP, email, OIDC, and mobile-approve methods for single- and
 //! multi-step verification. The CLI reports FIDO2 and biometric steps, which
@@ -6,7 +6,7 @@
 //!
 //! CLI-specific code (method resolution from flags, browser-open, QR
 //! rendering, TTY prompting) stays here; all HTTP, WebSocket, and poll
-//! logic delegates to `defguard_core::mfa`.
+//! logic delegates to `xguard_core::mfa`.
 
 use std::{
     future::Future,
@@ -14,10 +14,10 @@ use std::{
 };
 
 use clap::builder::{PossibleValue, PossibleValuesParser};
-use defguard_client_proto::defguard::{
+use xguard_client_proto::xguard::{
     client_types::MfaMethod, enterprise::posture::v2::DevicePostureData,
 };
-use defguard_core::{
+use xguard_core::{
     database::{
         models::{
             instance::Instance,
@@ -44,7 +44,7 @@ use crate::{
     state::CliError,
 };
 
-/// Convert a `defguard_core::mfa::MfaError` into a [`CliError`].
+/// Convert a `xguard_core::mfa::MfaError` into a [`CliError`].
 fn into_cli(err: mfa::MfaError) -> CliError {
     let msg = err.to_string();
     match err {
@@ -413,7 +413,7 @@ fn check_code_method(method: MfaMethod) -> Result<(), CliError> {
 
 /// Run the VPN MFA handshake for a single-step location (TOTP or email).
 ///
-/// The HTTP calls are handled by `defguard_core::mfa`; this function
+/// The HTTP calls are handled by `xguard_core::mfa`; this function
 /// handles CLI-specific code sourcing (TTY / --code / --code-command).
 pub(crate) async fn authorize(
     location: &Location<Id>,
@@ -736,7 +736,7 @@ async fn run_mobile_step(
 /// Run the OIDC MFA flow for a single-step external-IdP location.
 ///
 /// Opens the system browser and delegates the HTTP poll to
-/// `defguard_core::mfa::poll_openid_mfa`.
+/// `xguard_core::mfa::poll_openid_mfa`.
 ///
 /// When `json_mode` is true, progress messages on stderr are suppressed so
 /// that `--json` output consumers only see the final result/error.
@@ -773,7 +773,7 @@ pub(crate) async fn authorize_oidc(
 /// Run the mobile-approve MFA flow for a single-step location.
 ///
 /// Displays a QR code (terminal and/or `--qr-file` PNG) and delegates the
-/// WebSocket connection to `defguard_core::mfa::connect_mobile_approve`.
+/// WebSocket connection to `xguard_core::mfa::connect_mobile_approve`.
 ///
 /// When `json_mode` is true, progress messages on stderr are suppressed so
 /// that `--json` output consumers only see the final result/error.
@@ -906,7 +906,7 @@ fn open_url(_url: &str, _badge: &str, _json_mode: bool) {
 
 #[cfg(test)]
 mod tests {
-    use defguard_core::database::models::location::ServiceLocationMode;
+    use xguard_core::database::models::location::ServiceLocationMode;
     use sqlx::types::Json;
 
     use super::*;
@@ -1164,7 +1164,7 @@ mod tests {
         assert!(err.to_string().contains("oidc"));
     }
 
-    use defguard_core::database::models::location::{LocationMfaStep, LocationMfaStepMethod};
+    use xguard_core::database::models::location::{LocationMfaStep, LocationMfaStepMethod};
 
     fn step(methods: &[(LocationMfaMethod, bool)]) -> LocationMfaStep {
         LocationMfaStep {

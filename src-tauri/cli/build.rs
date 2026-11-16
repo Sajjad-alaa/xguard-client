@@ -12,19 +12,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .type_attribute(".", "#[derive(serde::Deserialize,serde::Serialize)]")
         // TODO: remove once it is used :)
         .type_attribute(
-            ".defguard.client_types.MfaConfigAuthorizeResponse",
+            ".xguard.client_types.MfaConfigAuthorizeResponse",
             "#[allow(unused)]",
         )
         .type_attribute(
-            ".defguard.client_types.MfaConfigSendCodeResponse",
+            ".xguard.client_types.MfaConfigSendCodeResponse",
             "#[allow(unused)]",
         )
         .type_attribute(
-            ".defguard.client_types.MfaConfigSendCodeRequest",
+            ".xguard.client_types.MfaConfigSendCodeRequest",
             "#[allow(unused)]",
         )
         .type_attribute(
-            ".defguard.client_types.MfaConfigStartRequest",
+            ".xguard.client_types.MfaConfigStartRequest",
             "#[allow(unused)]",
         )
         .compile_protos(&["../proto/v1/core/proxy.proto"], &["../proto"])?;

@@ -9,7 +9,7 @@ use serde_with::{serde_as, DisplayFromStr};
 use thiserror::Error;
 use tracing::Level;
 
-const SERVICE_LOG_PREFIX: &str = "defguard-service.";
+const SERVICE_LOG_PREFIX: &str = "xguard-service.";
 const SERVICE_LOG_SUFFIX: &str = ".log";
 
 pub mod global_log_watcher;
@@ -90,7 +90,7 @@ fn get_vpn_extension_log_dir_path() -> Result<PathBuf, LogWatcherError> {
 
     let manager = NSFileManager::defaultManager();
     manager
-        .containerURLForSecurityApplicationGroupIdentifier(ns_string!("group.net.defguard"))
+        .containerURLForSecurityApplicationGroupIdentifier(ns_string!("group.local.xguard"))
         .and_then(|url| url.to_file_path())
         .map_or_else(
             || {

@@ -1,6 +1,6 @@
-//! Log watcher for observing and parsing `defguard-service` log files
+//! Log watcher for observing and parsing `xguard-service` log files
 //!
-//! This is meant to handle passing relevant logs from `defguard-service` daemon to the client GUI.
+//! This is meant to handle passing relevant logs from `xguard-service` daemon to the client GUI.
 //! The watcher monitors a given directory for any changes. Whenever a change is detected
 //! it parses the log files and sends logs relevant to a specified interface to the fronted.
 //!
@@ -132,7 +132,7 @@ impl<'a> ServiceLogWatcher<'a> {
                 }
                 if self.cancellation_token.is_cancelled() {
                     info!(
-                        "The background task responsible for watching the defguard service log file for interface {} is being stopped.", self.interface_name
+                        "The background task responsible for watching the xguard service log file for interface {} is being stopped.", self.interface_name
                     );
                     break;
                 }
@@ -390,7 +390,7 @@ impl VpnExtensionLogWatcher {
 
 /// Starts a log watcher in a separate thread
 ///
-/// The watcher parses `defguard-service` log files and extracts logs relevant
+/// The watcher parses `xguard-service` log files and extracts logs relevant
 /// to the WireGuard interface for a given location.
 /// Logs are then transmitted to the frontend by using `tauri` `Events`.
 /// Returned value is the name of an event topic to monitor.
@@ -460,7 +460,7 @@ pub async fn spawn_log_watcher_task(
 
     let name = get_tunnel_or_location_name(location_id, connection_type).await;
     info!(
-        "A background task has been spawned to watch the defguard service log file for \
+        "A background task has been spawned to watch the xguard service log file for \
         {connection_type} {name} (interface {interface_name}), location's specific collected logs \
         will be displayed in the {connection_type}'s detailed view."
     );

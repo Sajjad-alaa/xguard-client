@@ -206,10 +206,10 @@ type TotpSetupProps = {
 };
 
 const TotpSetup = ({ secret, instanceName }: TotpSetupProps) => {
-  // Without an issuer every Defguard account is the same unlabeled row in the authenticator.
+  // Without an issuer every XGuard account is the same unlabeled row in the authenticator.
   const qrData = useMemo(() => {
-    const label = encodeURIComponent(`Defguard:${instanceName ?? 'account'}`);
-    return `otpauth://totp/${label}?secret=${secret}&issuer=Defguard`;
+    const label = encodeURIComponent(`XGuard:${instanceName ?? 'account'}`);
+    return `otpauth://totp/${label}?secret=${secret}&issuer=XGuard`;
   }, [secret, instanceName]);
 
   return (

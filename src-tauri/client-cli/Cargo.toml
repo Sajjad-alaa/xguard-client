@@ -1,6 +1,6 @@
 [package]
-name = "defguard-cli"
-description = "Command-line client for Defguard VPN - connect, disconnect, status"
+name = "xguard-cli"
+description = "Command-line client for XGuard VPN - connect, disconnect, status"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -12,11 +12,11 @@ version.workspace = true
 base64.workspace = true
 chrono.workspace = true
 clap.workspace = true
-common = { package = "defguard-client-common", path = "../common" }
-defguard_client_config_sync = { package = "defguard-client-config-sync", path = "../enterprise/config-sync" }
-defguard_client_posture = { package = "defguard-client-posture", path = "../enterprise/posture" }
-defguard_client_proto = { package = "defguard-client-proto", path = "../client-proto" }
-defguard_core = { package = "defguard-client-core", path = "../core" }
+common = { package = "xguard-client-common", path = "../common" }
+xguard_client_config_sync = { package = "xguard-client-config-sync", path = "../enterprise/config-sync" }
+xguard_client_posture = { package = "xguard-client-posture", path = "../enterprise/posture" }
+xguard_client_proto = { package = "xguard-client-proto", path = "../client-proto" }
+xguard_core = { package = "xguard-client-core", path = "../core" }
 image.workspace = true
 owo-colors.workspace = true
 qrcode.workspace = true

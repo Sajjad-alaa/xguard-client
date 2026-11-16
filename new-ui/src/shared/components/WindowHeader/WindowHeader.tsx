@@ -26,7 +26,7 @@ export const WindowHeader = ({ variant }: Props) => {
     <div id="window-header" className={clsx(`variant-${variant}`)}>
       <LogoIcon size={variant === 'desktop' ? 33 : 48} />
       <div className="info">
-        <p className="label">Defguard VPN Client</p>
+        <p className="label">XGuard VPN Client</p>
         {variant === 'compact' && <ConnectionWatcher placement="bottom-start" />}
         {variant === 'desktop' && isPresent(appVersion) && (
           <p className="version">{version()}</p>
@@ -53,7 +53,7 @@ const LogoIcon = ({ size = 48 }: { size?: number }) => {
     >
       <rect width="48" height="48" rx="12" fill={`url(#${id})`} />
       <path
-        d="M29.3374 7V13.9321L23.5061 10.466L16 14.9251V31.7619L23.5 36.2209L29.3313 32.7549V36.3271L26.5097 38.007L28.1784 39L31 37.3201V22.8439L23.5 18.3849L17.6687 21.8509V15.9118L23.5 12.4457L29.3313 15.9118V17.8852L31 18.8782V7.99297L29.3313 7H29.3374ZM17.6687 30.7689V24.8298L23.5 28.2959L29.3313 24.8298V30.7689L23.5 34.235L17.6687 30.7689ZM28.5 23.3435L23.5 26.3162L18.5 23.3435L23.5 20.3708L28.5 23.3435Z"
+        d="M24 10.298 L35.866 17.149 L35.866 30.851 L24 37.702 L12.134 30.851 L12.134 17.149 Z M14.217 18.352 L14.217 29.648 L24 35.296 L33.783 29.648 L33.783 18.352 L24 12.704 Z M17.344 19.238 L28.762 30.656 L30.656 28.762 L19.238 17.344 Z M28.762 17.344 L17.344 28.762 L19.238 30.656 L30.656 19.238 Z"
         fill="#3961DB"
       />
       <defs>

@@ -1,6 +1,6 @@
 #[cfg(windows)]
-use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
-use defguard_client_core::{
+use xguard_client_core::connection::daemon_client::DAEMON_CLIENT;
+use xguard_client_core::{
     database::{
         models::{instance::Instance, location::Location, wireguard_keys::WireguardKeys, Id},
         DB_POOL,
@@ -8,7 +8,7 @@ use defguard_client_core::{
     error::Error,
     proxy::post_with_headers,
 };
-use defguard_client_proto::defguard::enterprise::posture::v2::{
+use xguard_client_proto::xguard::enterprise::posture::v2::{
     DevicePostureCheckRequest, DevicePostureCheckResponse, DevicePostureData,
 };
 use reqwest::{StatusCode, Url};

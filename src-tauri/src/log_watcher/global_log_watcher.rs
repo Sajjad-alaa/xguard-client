@@ -457,7 +457,7 @@ impl GlobalLogWatcher {
     /// If the line doesn't match the regex, it's filtered out.
     fn parse_client_log_line(&self, line: &str) -> Result<Option<LogLine>, LogWatcherError> {
         // Example log:
-        // [2024-10-09][09:08:41][DEBUG][defguard_client::commands] Retrieving all locations.
+        // [2024-10-09][09:08:41][DEBUG][xguard_client::commands] Retrieving all locations.
         let regex = Regex::new(r"\[(.*?)\]\[(.*?)\]\[(.*?)\]\[(.*?)\] (.*)")?;
         let captures = regex
             .captures(line)

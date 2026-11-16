@@ -15,12 +15,12 @@
 	<key>com.apple.security.network.client</key>
 	<true/>
 	<key>com.apple.application-identifier</key>
-	<string>82GZ7KN29J.net.defguard</string>
+	<string>82GZ7KN29J.local.xguard</string>
 	<key>com.apple.developer.team-identifier</key>
 	<string>82GZ7KN29J</string>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.net.defguard</string>
+		<string>group.local.xguard</string>
 	</array>
 </dict>
 </plist>

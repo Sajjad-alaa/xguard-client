@@ -13,7 +13,7 @@ use active_state::ActiveConnectionInfo;
 #[cfg(target_os = "macos")]
 pub use apple::sync_locations_and_tunnels;
 use chrono::Utc;
-use defguard_wireguard_rs::net::IpAddrMask;
+use xguard_wireguard_rs::net::IpAddrMask;
 use serde::Serialize;
 pub use setup::{disconnect_interface, execute_command};
 #[cfg(not(target_os = "macos"))]

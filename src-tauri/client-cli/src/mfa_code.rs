@@ -12,7 +12,7 @@ use std::{
     process::Command,
 };
 
-use defguard_core::database::models::location::LocationMfaMethod;
+use xguard_core::database::models::location::LocationMfaMethod;
 use secrecy::SecretString;
 use tracing::debug;
 

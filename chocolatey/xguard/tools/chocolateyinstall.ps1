@@ -9,7 +9,7 @@ $packageArgs = @{
   fileType      = 'msi'
   url           = $url
 
-  softwareName  = 'defguard*'
+  softwareName  = 'xguard*'
 
   checksum      = $checksum
   checksumType  = 'sha256'
@@ -19,5 +19,5 @@ $packageArgs = @{
 }
 
 Install-ChocolateyPackage @packageArgs
-Write-Warning "IMPORTANT: Reboot or Re-login Required: On initial install the user is added to the defguard group.A reboot or logging out and back in is required for group membership changes to take effect. This is not required on subsequent updates."
+Write-Warning "IMPORTANT: Reboot or Re-login Required: On initial install the user is added to the xguard group.A reboot or logging out and back in is required for group membership changes to take effect. This is not required on subsequent updates."
  

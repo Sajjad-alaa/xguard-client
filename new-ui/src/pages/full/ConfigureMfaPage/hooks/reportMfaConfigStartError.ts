@@ -14,19 +14,19 @@ export const reportMfaConfigStartError = (err: unknown): void => {
   void logError(`MFA configuration start failed: ${err}`);
   if (err instanceof NoVerificationMethodError) {
     Snackbar.error(
-      'There is no method available to verify your identity on this Defguard instance. Contact your administrator.',
+      'There is no method available to verify your identity on this XGuard instance. Contact your administrator.',
     );
     return;
   }
   if (isMfaConfigMfaNotUsable(err)) {
     Snackbar.error(
-      "Browser passkeys don't work in the client. Add another MFA method in your Defguard profile.",
+      "Browser passkeys don't work in the client. Add another MFA method in your XGuard profile.",
     );
     return;
   }
   if (isMfaConfigUnsupported(err)) {
     Snackbar.error(
-      'This Defguard instance does not support configuring MFA from the client.',
+      'This XGuard instance does not support configuring MFA from the client.',
     );
     return;
   }

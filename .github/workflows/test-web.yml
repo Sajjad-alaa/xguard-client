@@ -26,7 +26,7 @@ permissions:
 jobs:
   test-web:
     runs-on:
-      - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
+      - codebuild-xguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Checkout

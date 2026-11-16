@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use defguard_client_config_sync::{poll_instances, PollInstanceResult};
-use defguard_core::{
+use xguard_client_config_sync::{poll_instances, PollInstanceResult};
+use xguard_core::{
     connection::active_state::active_state,
     database::models::{location::Location, Id},
     error::Error,

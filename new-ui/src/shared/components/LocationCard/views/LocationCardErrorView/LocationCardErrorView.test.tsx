@@ -29,7 +29,7 @@ describe('LocationCardErrorView', () => {
   it('shows the error icon and message', () => {
     mocks.cardError = {
       message:
-        'Your Defguard mobile app is out of date.\nUpgrade to approve this connection.',
+        'Your XGuard mobile app is out of date.\nUpgrade to approve this connection.',
       icon: IconKind.DisableMfa,
     };
     const { container } = render(<LocationCardErrorView />);

@@ -21,8 +21,8 @@ jobs:
       - name: Set MSI variables
         shell: pwsh
         run: |
-          $msiName = "Defguard_${env:VERSION}_x64_en-US.msi"
-          $msiUrl = "https://github.com/DefGuard/client/releases/download/v${env:VERSION}/Defguard_${env:VERSION}_x64_en-US.msi"
+          $msiName = "XGuard_${env:VERSION}_x64_en-US.msi"
+          $msiUrl = "https://github.com/Sajjad-alaa/xguard-client/releases/download/v${env:VERSION}/XGuard_${env:VERSION}_x64_en-US.msi"
           "MSI_NAME=$msiName" | Out-File -FilePath $env:GITHUB_ENV -Append
           "MSI_URL=$msiUrl" | Out-File -FilePath $env:GITHUB_ENV -Append
 
@@ -41,9 +41,9 @@ jobs:
 
       - name: Update Chocolatey package files
         shell: pwsh
-        working-directory: chocolatey/defguard
+        working-directory: chocolatey/xguard
         run: |
-          $nuspecPath = "defguard.nuspec"
+          $nuspecPath = "xguard.nuspec"
           $installPath = "tools\chocolateyinstall.ps1"
 
           (Get-Content -Raw $nuspecPath) `
@@ -57,21 +57,21 @@ jobs:
 
       - name: Refresh local nupkg
         shell: pwsh
-        working-directory: chocolatey/defguard
+        working-directory: chocolatey/xguard
         run: |
-          $old = Get-ChildItem -Filter "defguard.*.nupkg" | Where-Object { $_.Name -ne "defguard.$env:VERSION.nupkg" }
+          $old = Get-ChildItem -Filter "xguard.*.nupkg" | Where-Object { $_.Name -ne "xguard.$env:VERSION.nupkg" }
           if ($old) { $old | Remove-Item -Force }
 
       - name: Pack Chocolatey package
         shell: pwsh
-        working-directory: chocolatey/defguard
+        working-directory: chocolatey/xguard
         run: choco pack
 
       - name: Push Chocolatey package
         shell: pwsh
-        working-directory: chocolatey/defguard
+        working-directory: chocolatey/xguard
         env:
           CHOCO_API_KEY: ${{ secrets.CHOCO_API_KEY }}
         run: |
-          $nupkg = "defguard.$env:VERSION.nupkg"
+          $nupkg = "xguard.$env:VERSION.nupkg"
           choco push $nupkg --source "https://push.chocolatey.org/" -k="$env:CHOCO_API_KEY"

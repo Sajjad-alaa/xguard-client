@@ -98,7 +98,7 @@ jobs:
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
           echo "version=$VERSION" >> ${GITHUB_OUTPUT}
-          echo "DEFGUARD_CLIENT_BUILD_VERSION=${VERSION}-nightly" >> ${GITHUB_ENV}
+          echo "XGUARD_CLIENT_BUILD_VERSION=${VERSION}-nightly" >> ${GITHUB_ENV}
           BRANCH="${{ inputs.branch }}"
           echo "BRANCH=${BRANCH//\//-}" >> ${GITHUB_ENV}
           echo "SHA=$(git rev-parse --short HEAD)" >> ${GITHUB_ENV}
@@ -121,12 +121,12 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
         run: |
-          NAME="defguard-client-${{ matrix.binary_arch }}-${SHA}"
+          NAME="xguard-client-${{ matrix.binary_arch }}-${SHA}"
           aws s3 cp --acl public-read \
-            "src-tauri/target/release/bundle/deb/defguard-client_${VERSION}_${{ matrix.deb_arch }}.deb" \
+            "src-tauri/target/release/bundle/deb/xguard-client_${VERSION}_${{ matrix.deb_arch }}.deb" \
             "s3://${S3_BUCKET}/${S3_PREFIX}/${BRANCH}/${NAME}.deb"
           aws s3 cp --acl public-read \
-            "src-tauri/target/release/bundle/rpm/defguard-client-${VERSION}-1.${{ matrix.binary_arch }}.rpm" \
+            "src-tauri/target/release/bundle/rpm/xguard-client-${VERSION}-1.${{ matrix.binary_arch }}.rpm" \
             "s3://${S3_BUCKET}/${S3_PREFIX}/${BRANCH}/${NAME}.rpm"
 
   build-macos-pkg:
@@ -137,8 +137,8 @@ jobs:
     env:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
-      APPLE_SIGNING_IDENTITY: "Apple Distribution: defguard sp. z o.o. (82GZ7KN29J)"
-      APPLE_SIGNING_IDENTITY_INSTALLER: "3rd Party Mac Developer Installer: defguard sp. z o.o. (82GZ7KN29J)"
+      APPLE_SIGNING_IDENTITY: "Apple Distribution: xguard sp. z o.o. (82GZ7KN29J)"
+      APPLE_SIGNING_IDENTITY_INSTALLER: "3rd Party Mac Developer Installer: xguard sp. z o.o. (82GZ7KN29J)"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -150,7 +150,7 @@ jobs:
           VERSION=$(jq -r .version src-tauri/tauri.conf.json)
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-          echo "DEFGUARD_CLIENT_BUILD_VERSION=${VERSION}-nightly" >> ${GITHUB_ENV}
+          echo "XGUARD_CLIENT_BUILD_VERSION=${VERSION}-nightly" >> ${GITHUB_ENV}
           BRANCH="${{ inputs.branch }}"
           echo "BRANCH=${BRANCH//\//-}" >> ${GITHUB_ENV}
           echo "SHA=$(git rev-parse --short HEAD)" >> ${GITHUB_ENV}
@@ -220,8 +220,8 @@ jobs:
         run: |
           xcrun productbuild --keychain build.keychain \
             --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" \
-            --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" \
-            /Applications defguard-client.pkg
+            --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/XGuard.app" \
+            /Applications xguard-client.pkg
 
       - name: Upload PKG to S3
         env:
@@ -229,8 +229,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
         run: |
           export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
-          aws s3 cp --acl public-read defguard-client.pkg \
-            "s3://${S3_BUCKET}/${S3_PREFIX}/${BRANCH}/defguard-client-universal-${SHA}.pkg"
+          aws s3 cp --acl public-read xguard-client.pkg \
+            "s3://${S3_BUCKET}/${S3_PREFIX}/${BRANCH}/xguard-client-universal-${SHA}.pkg"
 
   # build-windows-msi:
   #   runs-on:
@@ -254,7 +254,7 @@ jobs:
   #         $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
   #         echo "Version: $version"
   #         echo "VERSION=$version" >> $env:GITHUB_ENV
-  #         echo "DEFGUARD_CLIENT_BUILD_VERSION=$version-nightly" >> $env:GITHUB_ENV
+  #         echo "XGUARD_CLIENT_BUILD_VERSION=$version-nightly" >> $env:GITHUB_ENV
   #         echo "BRANCH=$('${{ inputs.branch }}' -replace '/','-')" >> $env:GITHUB_ENV
   #         echo "SHA=$(git rev-parse --short HEAD)" >> $env:GITHUB_ENV
 
@@ -287,7 +287,7 @@ jobs:
   #         pnpm build
 
   #     - name: Build service and CLI binaries
-  #       run: cargo build --release --manifest-path src-tauri/Cargo.toml -p defguard-cli -p defguard-client-service
+  #       run: cargo build --release --manifest-path src-tauri/Cargo.toml -p xguard-cli -p xguard-client-service
 
   #     - name: Build MSI
   #       uses: tauri-apps/tauri-action@v0.5.23
@@ -302,5 +302,5 @@ jobs:
   #         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
   #         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
   #       run: |
-  #         aws s3 cp --acl public-read "src-tauri/target/release/bundle/msi/Defguard_${env:VERSION}_x64_en-US.msi" `
-  #           "s3://${env:S3_BUCKET}/${env:S3_PREFIX}/${env:BRANCH}/defguard-client-x64-${env:SHA}.msi"
+  #         aws s3 cp --acl public-read "src-tauri/target/release/bundle/msi/XGuard_${env:VERSION}_x64_en-US.msi" `
+  #           "s3://${env:S3_BUCKET}/${env:S3_PREFIX}/${env:BRANCH}/xguard-client-x64-${env:SHA}.msi"

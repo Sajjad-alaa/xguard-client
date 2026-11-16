@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::defguard::enterprise::posture::v2::{
+use crate::xguard::enterprise::posture::v2::{
     bool_check, int32_check, string_check, BoolCheck, Int32Check, StringCheck, UnavailableReason,
 };
 
@@ -65,7 +65,7 @@ impl From<wmi::WMIError> for UnavailableReason {
 
 #[cfg(test)]
 mod tests {
-    use crate::defguard::enterprise::posture::v2::{
+    use crate::xguard::enterprise::posture::v2::{
         bool_check, int32_check, string_check, BoolCheck, Int32Check, StringCheck,
         UnavailableReason,
     };

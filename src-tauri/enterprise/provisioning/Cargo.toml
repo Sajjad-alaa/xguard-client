@@ -1,6 +1,6 @@
 [package]
-name = "defguard-client-provisioning"
-description = "Zero-touch provisioning for the Defguard desktop client"
+name = "xguard-client-provisioning"
+description = "Zero-touch provisioning for the XGuard desktop client"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true

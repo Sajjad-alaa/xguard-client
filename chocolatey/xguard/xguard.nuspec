@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>xguard</id>
+    <version>1.6.10</version>
+    <title>XGuard</title>
+    <authors>XGuard</authors>
+    <projectUrl>https://xguard.local</projectUrl>
+    <iconUrl>http://rawcdn.githack.com/xguard/client/main/src/shared/images/png/logo_256-256.png</iconUrl>
+    <copyright>Copyright 2026 Defguard Sp. z o.o.</copyright>
+    <licenseUrl>https://github.com/Sajjad-alaa/xguard-client/blob/main/LICENSE.md</licenseUrl>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/Sajjad-alaa/xguard-client</projectSourceUrl>
+    <docsUrl>https://docs.xguard.local/</docsUrl>
+    <bugTrackerUrl>https://github.com/Sajjad-alaa/xguard-client/issues</bugTrackerUrl>
+    <tags>xguard vpn wireguard sso mfa</tags>
+    <summary>Desktop client for XGuard - Wireguard VPN with MFA</summary>
+    <description>Desktop client provides an easy way to access VPN locations of multiple XGuard instances via user-friendly UI.</description>
+    <releaseNotes>https://github.com/Sajjad-alaa/xguard-client/releases</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

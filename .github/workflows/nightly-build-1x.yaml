@@ -111,12 +111,12 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
         run: |
-          NAME="defguard-client-${{ matrix.binary_arch }}-${SHA}"
+          NAME="xguard-client-${{ matrix.binary_arch }}-${SHA}"
           aws s3 cp --acl public-read \
-            "src-tauri/target/release/bundle/deb/defguard-client_${VERSION}_${{ matrix.deb_arch }}.deb" \
+            "src-tauri/target/release/bundle/deb/xguard-client_${VERSION}_${{ matrix.deb_arch }}.deb" \
             "s3://${S3_BUCKET}/${S3_PREFIX}/${BRANCH}/${NAME}.deb"
           aws s3 cp --acl public-read \
-            "src-tauri/target/release/bundle/rpm/defguard-client-${VERSION}-1.${{ matrix.binary_arch }}.rpm" \
+            "src-tauri/target/release/bundle/rpm/xguard-client-${VERSION}-1.${{ matrix.binary_arch }}.rpm" \
             "s3://${S3_BUCKET}/${S3_PREFIX}/${BRANCH}/${NAME}.rpm"
 
   build-macos-pkg:
@@ -125,10 +125,10 @@ jobs:
       # sccache
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
-      APPLE_SIGNING_IDENTITY: "Apple Distribution: defguard sp. z o.o. (82GZ7KN29J)"
-      APPLE_SIGNING_IDENTITY_INSTALLER: "3rd Party Mac Developer Installer: defguard sp. z o.o. (82GZ7KN29J)"
+      APPLE_SIGNING_IDENTITY: "Apple Distribution: xguard sp. z o.o. (82GZ7KN29J)"
+      APPLE_SIGNING_IDENTITY_INSTALLER: "3rd Party Mac Developer Installer: xguard sp. z o.o. (82GZ7KN29J)"
       APPLE_PROVIDER_SHORT_NAME: "82GZ7KN29J"
-      APPLE_ID: "kamil@defguard.net"
+      APPLE_ID: "kamil@xguard.local"
       APPLE_TEAM_ID: "82GZ7KN29J"
     runs-on:
       - self-hosted
@@ -192,8 +192,8 @@ jobs:
         run: |
           xcrun productbuild --keychain build.keychain \
             --sign "${{ env.APPLE_SIGNING_IDENTITY_INSTALLER }}" \
-            --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/Defguard.app" \
-            /Applications defguard-client.pkg
+            --component "src-tauri/target/universal-apple-darwin/release/bundle/macos/XGuard.app" \
+            /Applications xguard-client.pkg
 
       - name: Upload PKG to S3
         env:
@@ -201,5 +201,5 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
         run: |
           export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
-          aws s3 cp --acl public-read defguard-client.pkg \
-            "s3://${S3_BUCKET}/${S3_PREFIX}/${BRANCH}/defguard-client-universal-${SHA}.pkg"
+          aws s3 cp --acl public-read xguard-client.pkg \
+            "s3://${S3_BUCKET}/${S3_PREFIX}/${BRANCH}/xguard-client-universal-${SHA}.pkg"

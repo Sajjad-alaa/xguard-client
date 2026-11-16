@@ -1,7 +1,7 @@
 # Client E2E tests
 
 The client E2E suite runs the Linux Tauri client through WebDriver. It expects the
-Defguard services to be running separately.
+XGuard services to be running separately.
 
 ## Requirements
 
@@ -11,7 +11,7 @@ Defguard services to be running separately.
 - The Gateway connected to the test network and reachable through WireGuard.
 - An administrator account whose login does not require MFA. The password is supplied through `e2e/.env`.
 - A dedicated deployment with exactly one test network named `e2e`. The connection checks use the first visible connect button.
-- Root `defguard-service` running with `/var/run/defguard.socket` available.
+- Root `xguard-service` running with `/var/run/xguard.socket` available.
 - Rust/Cargo with the Tauri CLI, Node.js, `pnpm`, `just`, `WebKitWebDriver`, `xvfb-run`, and `dbus-run-session` available.
 - `tauri-driver` available at `~/.cargo/bin/tauri-driver`, or at the path set by `TAURI_DRIVER`.
 

@@ -1,5 +1,5 @@
 use chrono::Utc;
-use defguard_core::connection::{
+use xguard_core::connection::{
     active_state::{active_state, ActiveConnectionInfo},
     tear_down,
 };

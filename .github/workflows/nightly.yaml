@@ -5,8 +5,8 @@ on:
   workflow_dispatch:
 
 env:
-  S3_BUCKET: nightly.defguard.net
-  S3_PREFIX: defguard-client
+  S3_BUCKET: nightly.xguard.local
+  S3_PREFIX: xguard-client
   AWS_DEFAULT_REGION: eu-central-1
 
 jobs:
@@ -14,8 +14,8 @@ jobs:
     uses: ./.github/workflows/nightly-build-2x.yaml
     with:
       branch: release/2.1
-      s3_bucket: nightly.defguard.net
-      s3_prefix: defguard-client
+      s3_bucket: nightly.xguard.local
+      s3_prefix: xguard-client
       aws_region: eu-central-1
     secrets: inherit
 
@@ -25,8 +25,8 @@ jobs:
     uses: ./.github/workflows/nightly-build-2x.yaml
     with:
       branch: dev
-      s3_bucket: nightly.defguard.net
-      s3_prefix: defguard-client
+      s3_bucket: nightly.xguard.local
+      s3_prefix: xguard-client
       aws_region: eu-central-1
     secrets: inherit
 
@@ -36,8 +36,8 @@ jobs:
     uses: ./.github/workflows/nightly-build-1x.yaml
     with:
       branch: main
-      s3_bucket: nightly.defguard.net
-      s3_prefix: defguard-client
+      s3_bucket: nightly.xguard.local
+      s3_prefix: xguard-client
       aws_region: eu-central-1
     secrets: inherit
 
@@ -80,9 +80,9 @@ jobs:
           {
             echo '<!doctype html>'
             echo '<meta charset="utf-8">'
-            echo '<title>defguard-client nightly builds</title>'
+            echo '<title>xguard-client nightly builds</title>'
             echo '<style>body{font-family:sans-serif;margin:2rem}table{border-collapse:collapse;margin-bottom:2rem}th,td{padding:.3rem 1.5rem .3rem 0;border-bottom:1px solid #ddd;white-space:nowrap}</style>'
-            echo '<h1>defguard-client nightly builds</h1>'
+            echo '<h1>xguard-client nightly builds</h1>'
             jq -r --slurpfile versions versions.json '
               (. // [])
               | group_by(.key | split("/")[1])

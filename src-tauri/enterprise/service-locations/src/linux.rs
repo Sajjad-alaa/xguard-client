@@ -8,12 +8,12 @@ use std::{
     time::SystemTime,
 };
 
-use defguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
-use defguard_client_proto::{
+use xguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
+use xguard_client_proto::{
     conversions::normalize_allowed_ips,
-    defguard::client::v1::{SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode},
+    xguard::client::v1::{SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode},
 };
-use defguard_wireguard_rs::{
+use xguard_wireguard_rs::{
     key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
 use log::{debug, error, info, warn};
@@ -27,14 +27,14 @@ use crate::{
     ServiceLocationData, ServiceLocationError, ServiceLocationManager,
 };
 
-const DEFGUARD_DIR: &str = "/etc/defguard";
+const XGUARD_DIR: &str = "/etc/xguard";
 const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
 const SERVICE_LOCATION_DIR_PERMS: u32 = 0o700;
 const SERVICE_LOCATION_FILE_PERMS: u32 = 0o600;
 const DEFAULT_WIREGUARD_PORT: u16 = 51820;
 
 fn get_shared_directory() -> PathBuf {
-    PathBuf::from(DEFGUARD_DIR).join(SERVICE_LOCATIONS_SUBDIR)
+    PathBuf::from(XGUARD_DIR).join(SERVICE_LOCATIONS_SUBDIR)
 }
 
 fn get_instance_file_path(instance_id: &str) -> Result<PathBuf, ServiceLocationError> {

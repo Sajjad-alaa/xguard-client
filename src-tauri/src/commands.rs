@@ -3,8 +3,8 @@ use std::{collections::HashMap, env, future::Future, str::FromStr, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 #[cfg(not(target_os = "macos"))]
-use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
-use defguard_client_core::{
+use xguard_client_core::connection::daemon_client::DAEMON_CLIENT;
+use xguard_client_core::{
     connection::{
         active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
         disconnect_interface, ConflictingConnection, ConnectionTarget,
@@ -14,13 +14,13 @@ use defguard_client_core::{
     mfa_config::{self, AuthorizeProof, MfaConfigError, MfaConfigSession, SetupProof},
     mfa_contract::MfaContract,
 };
-use defguard_client_fido2::{pin_policy, Assertion, Fido2Error, PinPolicy, PlatformContext};
-use defguard_client_posture::authorize_posture_session;
+use xguard_client_fido2::{pin_policy, Assertion, Fido2Error, PinPolicy, PlatformContext};
+use xguard_client_posture::authorize_posture_session;
 #[cfg(not(target_os = "macos"))]
-use defguard_client_proto::defguard::client::v1::{
+use xguard_client_proto::xguard::client::v1::{
     DeleteServiceLocationsRequest, RemoveInterfaceRequest,
 };
-use defguard_client_proto::defguard::{
+use xguard_client_proto::xguard::{
     client_types::{
         mfa_step_result, AdminInfo, CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse,
         DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
@@ -29,7 +29,7 @@ use defguard_client_proto::defguard::{
     },
     enterprise::posture::v2::DevicePostureData,
 };
-use defguard_client_provisioning::{clear_provisioning_config, ProvisioningConfig};
+use xguard_client_provisioning::{clear_provisioning_config, ProvisioningConfig};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
@@ -37,7 +37,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
+const UPDATE_URL: &str = "https://pkgs.xguard.local/api/update/check";
 
 use crate::{
     app_config::{AppConfig, AppConfigPatch},
@@ -278,7 +278,7 @@ pub async fn connect(
                     location, managed by the background service"
                 );
                 return Err(Error::InvalidInput(format!(
-                    "Location \"{}\" is a service location and is managed by the defguard service",
+                    "Location \"{}\" is a service location and is managed by the xguard service",
                     location.name
                 ))
                 .into());
@@ -1461,18 +1461,18 @@ pub struct AppVersionInfo {
     pub summary: Option<String>,
 }
 
-const PRODUCT_NAME: &str = "defguard-client";
+const PRODUCT_NAME: &str = "xguard-client";
 
 fn reported_app_version(package_version: &str) -> String {
-    defguard_client_core::version::select_reported_app_version(
+    xguard_client_core::version::select_reported_app_version(
         package_version,
-        option_env!("DEFGUARD_CLIENT_BUILD_VERSION"),
+        option_env!("XGUARD_CLIENT_BUILD_VERSION"),
     )
 }
 
 #[tauri::command]
 pub fn get_client_build_version() -> String {
-    reported_app_version(defguard_client_core::version::PKG_VERSION)
+    reported_app_version(xguard_client_core::version::PKG_VERSION)
 }
 
 #[tauri::command(async)]
@@ -1595,7 +1595,7 @@ pub fn get_platform_header() -> String {
 #[tauri::command(async)]
 pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
     debug!("Received a command to prepare posture report");
-    defguard_client_posture::get_posture_data().await
+    xguard_client_posture::get_posture_data().await
 }
 
 #[derive(Debug, Serialize)]
@@ -2023,7 +2023,7 @@ async fn mfa_start_request(
         .map_err(|err| err.to_string())?;
     let posture_data = if location.posture_check_required {
         Some(
-            defguard_client_posture::get_posture_data()
+            xguard_client_posture::get_posture_data()
                 .await
                 .map_err(|e| format!("Failed to collect posture data: {e}"))?,
         )
@@ -2529,7 +2529,7 @@ async fn fido2_assertion(
     context: PlatformContext,
     cancel: CancellationToken,
 ) -> Result<Assertion, mfa::MfaError> {
-    defguard_client_fido2::assert_for_mfa(
+    xguard_client_fido2::assert_for_mfa(
         &rp_id,
         &challenge.challenge,
         &challenge.credential_ids,
@@ -2917,7 +2917,7 @@ pub async fn mfa_config_authorize_fido2(
     let _ = handle.emit(EventKey::MfaConfigFido2Touch.into(), ());
     // the prompt must not open behind the window that asked for it
     let level = WindowLevelGuard::lower(&window);
-    let assertion = defguard_client_fido2::assert_for_mfa(
+    let assertion = xguard_client_fido2::assert_for_mfa(
         &rp_id,
         &challenge.challenge,
         &challenge.credential_ids,
@@ -2929,7 +2929,7 @@ pub async fn mfa_config_authorize_fido2(
     .map_err(|err| match err {
         // Core minted the challenge, so a bad one is not the user's problem
         Fido2Error::MalformedChallenge(detail) => mfa_config_other(format!(
-            "Defguard sent a malformed security key challenge: {detail}"
+            "XGuard sent a malformed security key challenge: {detail}"
         )),
         err => err_to_json(mfa_config_fido2_error(&err, "authorize the request")),
     })?;
@@ -3105,7 +3105,7 @@ pub async fn mfa_config_setup_fido2(
     .map_err(err_to_json)?;
     let challenge = started
         .fido2_creation_challenge
-        .ok_or_else(|| mfa_config_other("Defguard did not return a security key challenge"))?;
+        .ok_or_else(|| mfa_config_other("XGuard did not return a security key challenge"))?;
 
     // the cancel may have landed while the challenge was in flight
     if ceremony.is_cancelled() {
@@ -3117,7 +3117,7 @@ pub async fn mfa_config_setup_fido2(
     let _ = handle.emit(EventKey::MfaConfigFido2Touch.into(), ());
     // the prompt must not open behind the window that asked for it
     let _level = WindowLevelGuard::lower(&window);
-    let attestation = defguard_client_fido2::register_security_key(
+    let attestation = xguard_client_fido2::register_security_key(
         &challenge,
         &instance_url,
         pin,
@@ -3128,7 +3128,7 @@ pub async fn mfa_config_setup_fido2(
     .map_err(|err| match err {
         // Core minted the challenge, so a bad one is not the user's problem
         Fido2Error::MalformedChallenge(detail) => mfa_config_other(format!(
-            "Defguard sent a malformed security key challenge: {detail}"
+            "XGuard sent a malformed security key challenge: {detail}"
         )),
         err => err_to_json(mfa_config_fido2_error(&err, "complete the registration")),
     })?;
@@ -3225,8 +3225,8 @@ pub async fn mfa_config_cancel(
 
 #[cfg(test)]
 mod tests {
-    use defguard_client_core::database::models::instance::MfaCapabilities;
-    use defguard_client_proto::defguard::client_types::{
+    use xguard_client_core::database::models::instance::MfaCapabilities;
+    use xguard_client_proto::xguard::client_types::{
         mfa_flow_start_response, mfa_step_started, MfaAdvanced, MfaAwaitingExternal, MfaCompleted,
         MfaFido2Challenge, MfaFlowStartAccepted, MfaFlowStartResponse, MfaFlowStepStartResponse,
         MfaStepResult, MfaStepStarted,
@@ -3282,7 +3282,7 @@ mod tests {
                     first_step: Some(MfaStepStarted {
                         step_attempt_id: attempt_id.into(),
                         challenge: Some(mfa_step_started::Challenge::Signature(
-                            defguard_client_proto::defguard::client_types::MfaSignatureChallenge {
+                            xguard_client_proto::xguard::client_types::MfaSignatureChallenge {
                                 challenge: challenge.into(),
                             },
                         )),
@@ -3323,7 +3323,7 @@ mod tests {
                 step_attempt_id: attempt_id.into(),
                 challenge: challenge.map(|challenge| {
                     mfa_step_started::Challenge::Signature(
-                        defguard_client_proto::defguard::client_types::MfaSignatureChallenge {
+                        xguard_client_proto::xguard::client_types::MfaSignatureChallenge {
                             challenge: challenge.into(),
                         },
                     )

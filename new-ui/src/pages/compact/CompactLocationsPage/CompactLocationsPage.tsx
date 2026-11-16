@@ -114,7 +114,7 @@ export const CompactLocationsPage = () => {
           <Button
             variant={ButtonVariant.Secondary}
             size="primary"
-            text="Open Defguard"
+            text="Open XGuard"
             onClick={() => {
               void api.swapToFullView();
             }}

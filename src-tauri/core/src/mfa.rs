@@ -5,7 +5,7 @@
 
 use std::time::Duration;
 
-use defguard_client_proto::defguard::{
+use xguard_client_proto::xguard::{
     client_types::{
         mfa_flow_start_response,
         mfa_flow_step_finish_request::Submission as MfaFlowFinishSubmission, mfa_step_result,
@@ -48,7 +48,7 @@ const ATTEMPT_LIMIT_MESSAGE: &str = "Too many failed MFA attempts. Please try co
 /// Both MFA start paths use this message when they report that case.
 const MOBILE_NOT_REGISTERED_MESSAGE: &str =
     "No mobile authenticator is registered for your account. \
-     Register one in the Defguard mobile app, then retry.";
+     Register one in the XGuard mobile app, then retry.";
 
 /// Error type returned by MFA operations.
 ///
@@ -72,7 +72,7 @@ pub enum MfaError {
     #[error("{message}")]
     AttemptLimit { message: String },
 
-    #[error("The Defguard mobile app must be updated to approve this connection")]
+    #[error("The XGuard mobile app must be updated to approve this connection")]
     MobileClientOutdated,
 
     #[error("MFA operation timed out")]

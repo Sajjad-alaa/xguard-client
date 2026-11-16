@@ -20,8 +20,8 @@ pub mod utils;
 pub mod window_manager;
 
 #[cfg(unix)]
-pub use defguard_client_core::set_perms;
-pub use defguard_client_core::{
+pub use xguard_client_core::set_perms;
+pub use xguard_client_core::{
     app_config,
     app_data_dir,
     connection,
@@ -50,13 +50,13 @@ pub use defguard_client_core::{
 
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
 pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub use defguard_client_common::{check_version_flag, version_string};
+pub use xguard_client_common::{check_version_flag, version_string};
 
 #[macro_use]
 extern crate log;
 
 /// Converts a tauri emit result into our error type.
 #[must_use]
-pub fn tauri_err_to_app_err(e: tauri::Error) -> defguard_client_core::error::Error {
-    defguard_client_core::error::Error::Tauri(e.to_string())
+pub fn tauri_err_to_app_err(e: tauri::Error) -> xguard_client_core::error::Error {
+    xguard_client_core::error::Error::Tauri(e.to_string())
 }

@@ -9,8 +9,8 @@ pub(crate) mod windows;
 
 use std::env::consts::OS;
 
-use defguard_client_core::version::{select_reported_app_version, PKG_VERSION};
-use defguard_client_proto::defguard::enterprise::posture::v2::{
+use xguard_client_core::version::{select_reported_app_version, PKG_VERSION};
+use xguard_client_proto::xguard::enterprise::posture::v2::{
     BoolCheck, DevicePostureData, Int32Check, StringCheck, UnavailableReason,
 };
 use sysinfo::System;
@@ -79,7 +79,7 @@ fn disk_encryption_status(target: DiskEncryptionTarget) -> Result<bool, Unavaila
     #[cfg(target_os = "linux")]
     {
         let path = match target {
-            DiskEncryptionTarget::ClientDatabase => defguard_client_core::database::db_file_path()
+            DiskEncryptionTarget::ClientDatabase => xguard_client_core::database::db_file_path()
                 .ok_or(UnavailableReason::DetectionFailed)?,
             DiskEncryptionTarget::RootFilesystem => std::path::PathBuf::from("/"),
         };
@@ -140,9 +140,9 @@ fn security_update_age_days() -> Result<i32, UnavailableReason> {
 #[must_use]
 pub fn device_posture_data(disk_target: DiskEncryptionTarget) -> DevicePostureData {
     DevicePostureData {
-        defguard_client_version: select_reported_app_version(
+        xguard_client_version: select_reported_app_version(
             PKG_VERSION,
-            option_env!("DEFGUARD_CLIENT_BUILD_VERSION"),
+            option_env!("XGUARD_CLIENT_BUILD_VERSION"),
         ),
         os_type: OS.to_string(),
         os_name: Some(StringCheck::from(os_name())),

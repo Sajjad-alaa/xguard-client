@@ -52,7 +52,7 @@ describe("provisioning", () => {
 		if (!dataDir) throw new Error("E2E_DATA_DIR is required");
 		expect(
 			fs.existsSync(
-				path.join(dataDir, "share", "net.defguard", "provisioning.json"),
+				path.join(dataDir, "share", "local.xguard", "provisioning.json"),
 			),
 		).toBe(true);
 

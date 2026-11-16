@@ -38,7 +38,7 @@ export const provisioningFile = ({
 	});
 
 export const deepLinkArg = ({ url, token }: DeepLinkFixture): string =>
-	`defguard://addinstance?token=${encodeURIComponent(token)}&url=${encodeURIComponent(url)}`;
+	`xguard://addinstance?token=${encodeURIComponent(token)}&url=${encodeURIComponent(url)}`;
 
 export const launchConfigs: Record<string, LaunchConfig> = {
 	"deep_link_cold_start.spec.ts": {
@@ -76,7 +76,7 @@ export const writeLaunchFiles = (
 	dataDir: string,
 	files: Record<string, string>,
 ): void => {
-	const appDataDir = path.join(dataDir, "share", "net.defguard");
+	const appDataDir = path.join(dataDir, "share", "local.xguard");
 	fs.mkdirSync(appDataDir, { recursive: true });
 	for (const [fileName, contents] of Object.entries(files)) {
 		fs.writeFileSync(path.join(appDataDir, fileName), contents);

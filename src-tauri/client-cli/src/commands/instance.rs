@@ -1,4 +1,4 @@
-use defguard_core::database::models::{instance::Instance, Id};
+use xguard_core::database::models::{instance::Instance, Id};
 use serde_json::{json, Value};
 
 use crate::{
@@ -125,7 +125,7 @@ impl CommandOutput for InstanceShowResult {
 
 #[cfg(test)]
 mod tests {
-    use defguard_core::{
+    use xguard_core::{
         database::models::instance::{ClientTrafficPolicy, OpenIdProviderKind},
         mfa_contract::MfaContract,
     };

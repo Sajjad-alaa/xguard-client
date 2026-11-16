@@ -93,7 +93,7 @@ jobs:
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-          echo "DEFGUARD_CLIENT_BUILD_VERSION=${GITHUB_REF_NAME#v}" >> ${GITHUB_ENV}
+          echo "XGUARD_CLIENT_BUILD_VERSION=${GITHUB_REF_NAME#v}" >> ${GITHUB_ENV}
 
       - name: Install Node dependencies for new UI
         run: |
@@ -125,17 +125,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
-          asset_name: defguard-client${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
+          asset_path: src-tauri/target/release/bundle/deb/xguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+          asset_name: xguard-client${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb
           asset_content_type: application/octet-stream
 
       - name: Rename dg binary
         run: mv src-tauri/target/release/dg dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}
 
       - name: Build dg deb
-        uses: defGuard/fpm-action@ebb2575fbb892876fbdd326bb6d12524fbd7398c # main
+        uses: xGuard/fpm-action@ebb2575fbb892876fbdd326bb6d12524fbd7398c # main
         with:
-          fpm_args: "dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
+          fpm_args: "dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/xguard/dg.conf"
           fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ env.VERSION }}_${{ matrix.deb_arch }}_ubuntu-22-04-lts.deb"
 
       - name: Upload DEB
@@ -181,7 +181,7 @@ jobs:
           VERSION=$(echo ${GITHUB_REF_NAME#v} | cut -d '-' -f1)
           echo Version: $VERSION
           echo "VERSION=$VERSION" >> ${GITHUB_ENV}
-          echo "DEFGUARD_CLIENT_BUILD_VERSION=${GITHUB_REF_NAME#v}" >> ${GITHUB_ENV}
+          echo "XGUARD_CLIENT_BUILD_VERSION=${GITHUB_REF_NAME#v}" >> ${GITHUB_ENV}
 
       - name: Install system dependencies
         run: |
@@ -243,7 +243,7 @@ jobs:
         id: calculate-sha256
         if: matrix.deb_arch == 'amd64'
         run: |
-          DEB_FILE="src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb"
+          DEB_FILE="src-tauri/target/release/bundle/deb/xguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb"
           DEB_SHA256=$(sha256sum "$DEB_FILE" | cut -d ' ' -f1)
           echo "DEB SHA256: $DEB_SHA256"
           echo "DEB_SHA256=$DEB_SHA256" >> ${GITHUB_ENV}
@@ -255,7 +255,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/rpm/defguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
+          asset_path: src-tauri/target/release/bundle/rpm/xguard-client-${{ env.VERSION }}-1.${{ matrix.binary_arch }}.rpm
           asset_content_type: application/octet-stream
 
       - name: Upload DEB
@@ -264,14 +264,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/deb/defguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
+          asset_path: src-tauri/target/release/bundle/deb/xguard-client_${{ env.VERSION }}_${{ matrix.deb_arch }}.deb
           asset_content_type: application/octet-stream
 
       - name: Rename and tar client binary
         run: |
-          mv src-tauri/target/release/defguard-client defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-          tar -zcf defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz \
-            defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+          mv src-tauri/target/release/xguard-client xguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+          tar -zcf xguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz \
+            xguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
 
       - name: Upload client archive
         uses: shogo82148/actions-upload-release-asset@9ee13965a8a51926f330b424693f25fcff8f2ef6 # v1
@@ -279,14 +279,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: defguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_path: xguard-client-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
 
       - name: Rename and tar daemon binary
         run: |
-          mv src-tauri/target/release/defguard-service defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
-          tar -zcf defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz \
-            defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+          mv src-tauri/target/release/xguard-service xguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
+          tar -zcf xguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz \
+            xguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}
 
       - name: Upload daemon archive
         uses: shogo82148/actions-upload-release-asset@9ee13965a8a51926f330b424693f25fcff8f2ef6 # v1
@@ -294,7 +294,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: defguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
+          asset_path: xguard-service-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/octet-stream
 
       - name: Rename and tar dg binary
@@ -313,9 +313,9 @@ jobs:
           asset_content_type: application/octet-stream
 
       - name: Build dg deb
-        uses: defGuard/fpm-action@ebb2575fbb892876fbdd326bb6d12524fbd7398c # main
+        uses: xGuard/fpm-action@ebb2575fbb892876fbdd326bb6d12524fbd7398c # main
         with:
-          fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
+          fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/xguard/dg.conf"
           fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type deb --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.deb"
 
       - name: Upload DEB
@@ -328,9 +328,9 @@ jobs:
           asset_content_type: application/octet-stream
 
       - name: Build dg rpm
-        uses: defGuard/fpm-action@ebb2575fbb892876fbdd326bb6d12524fbd7398c # main
+        uses: xGuard/fpm-action@ebb2575fbb892876fbdd326bb6d12524fbd7398c # main
         with:
-          fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
+          fpm_args: "dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/xguard/dg.conf"
           fpm_opts: "--architecture ${{ matrix.binary_arch }} --debug --output-type rpm --version ${{ env.VERSION }} --package dg-linux-${{ matrix.binary_arch }}-${{ github.ref_name }}.rpm"
 
       - name: Upload RPM
@@ -383,13 +383,13 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       - name: Build dg (AlmaLinux 9)
-        run: cargo build --release --manifest-path src-tauri/Cargo.toml -p defguard-dg --bin dg
+        run: cargo build --release --manifest-path src-tauri/Cargo.toml -p xguard-dg --bin dg
       - name: Rename dg binary
         run: mv src-tauri/target/release/dg dg-linux-x86_64-${{ github.ref_name }}
       - name: Build dg rpm
-        uses: defGuard/fpm-action@ebb2575fbb892876fbdd326bb6d12524fbd7398c # main
+        uses: xGuard/fpm-action@ebb2575fbb892876fbdd326bb6d12524fbd7398c # main
         with:
-          fpm_args: "dg-linux-x86_64-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/defguard/dg.conf"
+          fpm_args: "dg-linux-x86_64-${{ github.ref_name }}=/usr/sbin/dg dg.service=/usr/lib/systemd/system/dg.service src-tauri/cli/.env=/etc/xguard/dg.conf"
           fpm_opts: "--architecture x86_64 --debug --output-type rpm --version ${{ env.VERSION }} --no-auto-depends --depends openssl-libs --depends wireguard-tools --package dg-linux-x86_64-${{ github.ref_name }}-el9.rpm"
       - name: Upload RPM
         uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1.0.2
@@ -459,7 +459,7 @@ jobs:
   #       uses: actions/upload-artifact@v4
   #       with:
   #         name: unsigned-bundle-${{ matrix.cpu }}
-  #         path: src-tauri/target/release/bundle/msi/Defguard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi
+  #         path: src-tauri/target/release/bundle/msi/XGuard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi
 
   # Signs the MSI and uploads it as release asset
   # sign-bundle:
@@ -488,13 +488,13 @@ jobs:
   #       with:
   #         name: unsigned-bundle-${{ matrix.cpu }}
   #     - name: Sign bundle
-  #       run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.72-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in Defguard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi -out Defguard-signed.msi
+  #       run: osslsigncode sign -pkcs11module /srv/codesign/certum/sc30pkcs11-3.0.6.72-MS.so -pkcs11cert ${{ secrets.CODESIGN_KEYID }} -key ${{ secrets.CODESIGN_KEYID }} -pass ${{ secrets.CODESIGN_PIN }} -h sha256 -t http://time.certum.pl/ -in XGuard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi -out XGuard-signed.msi
   #     - name: Upload installer asset
   #       uses: shogo82148/actions-upload-release-asset@v1
   #       env:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   #       with:
   #         upload_url: ${{ needs.create-release.outputs.upload_url }}
-  #         asset_path: Defguard-signed.msi
-  #         asset_name: Defguard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi
+  #         asset_path: XGuard-signed.msi
+  #         asset_name: XGuard_${{ env.VERSION }}_${{ matrix.cpu }}_en-US.msi
   #         asset_content_type: application/octet-stream

@@ -13,8 +13,8 @@ use database::models::{
     },
     Id,
 };
-use defguard_client_proto::defguard::client_types::DeviceConfig;
-use defguard_wireguard_rs::net::IpAddrMask;
+use xguard_client_proto::xguard::client_types::DeviceConfig;
+use xguard_wireguard_rs::net::IpAddrMask;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Json;
 
@@ -35,14 +35,14 @@ pub mod version;
 pub mod wg_config;
 
 // Re-export proto module for backward compatibility within core.
-pub use defguard_client_proto::defguard as proto;
+pub use xguard_client_proto::xguard as proto;
 
 use crate::database::models::NoId;
 
 #[macro_use]
 extern crate log;
 
-const BUNDLE_IDENTIFIER: &str = "net.defguard";
+const BUNDLE_IDENTIFIER: &str = "local.xguard";
 
 /// Returns the path to the user's data directory.
 #[must_use]
@@ -250,7 +250,7 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
 #[allow(deprecated)]
 mod tests {
     use chrono::{Duration, Utc};
-    use defguard_client_proto::defguard::client_types::{
+    use xguard_client_proto::xguard::client_types::{
         DeviceConfig, MfaMethod as ProtoMfaMethod, MfaStep as ProtoMfaStep,
         MfaStepMethod as ProtoMfaStepMethod,
     };

@@ -13,7 +13,7 @@ use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, Sq
 use crate::set_perms;
 use crate::{app_data_dir, error::Error};
 
-const DB_NAME: &str = "defguard.db";
+const DB_NAME: &str = "xguard.db";
 
 pub mod models;
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use defguard_core::database::models::{
+use xguard_core::database::models::{
     instance::{ClientTrafficPolicy, Instance},
     location::Location,
     tunnel::Tunnel,
@@ -196,7 +196,7 @@ fn format_list_table(
 
 #[cfg(test)]
 mod tests {
-    use defguard_core::{
+    use xguard_core::{
         database::models::{
             instance::{ClientTrafficPolicy, Instance, OpenIdProviderKind},
             location::{Location, LocationMfaMode, ServiceLocationMode},

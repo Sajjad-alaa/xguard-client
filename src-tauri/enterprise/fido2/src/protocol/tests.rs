@@ -5,7 +5,7 @@ use super::*;
 fn challenge_json() -> String {
     json!({
         "publicKey": {
-            "rp": { "name": "Defguard", "id": "vpn.example.com" },
+            "rp": { "name": "XGuard", "id": "vpn.example.com" },
             "user": {
                 // "user-handle" in base64url.
                 "id": "dXNlci1oYW5kbGU",
@@ -63,7 +63,7 @@ fn test_ceremony_follows_the_options_core_sent() {
         .request;
 
     assert_eq!(request.rp_id, "vpn.example.com");
-    assert_eq!(request.rp_name, "Defguard");
+    assert_eq!(request.rp_name, "XGuard");
     assert_eq!(request.user.id, b"user-handle");
     assert_eq!(request.user.name, "admin");
     assert_eq!(request.exclude_credentials, vec![b"cred-one".to_vec()]);
@@ -107,7 +107,7 @@ fn test_missing_relying_party_id_falls_back_to_the_instance_host() {
 /// Platform dialogs name the relying party and will not accept an empty name.
 #[test]
 fn test_missing_relying_party_name_falls_back_to_the_id() {
-    let without_rp_name = challenge_json().replace(r#""name":"Defguard""#, r#""name":null"#);
+    let without_rp_name = challenge_json().replace(r#""name":"XGuard""#, r#""name":null"#);
 
     let request = prepare_registration(&without_rp_name, &origin())
         .unwrap()

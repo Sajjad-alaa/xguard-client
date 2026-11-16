@@ -1,6 +1,6 @@
 [package]
-name = "defguard-client-posture"
-description = "Device posture checks for the Defguard desktop client"
+name = "xguard-client-posture"
+description = "Device posture checks for the XGuard desktop client"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -9,8 +9,8 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-defguard-client-core = { path = "../../core" }
-defguard-client-proto = { path = "../../client-proto" }
+xguard-client-core = { path = "../../core" }
+xguard-client-proto = { path = "../../client-proto" }
 log.workspace = true
 reqwest.workspace = true
 serde.workspace = true

@@ -24,7 +24,7 @@ type Options = {
   onSessionExpired: () => void;
   /** Copy for anything untagged, never the raw string, which may be a Rust message. */
   fallback: string;
-  /** Whether this step has a code field. Without one, a rejection gets Defguard's own message
+  /** Whether this step has a code field. Without one, a rejection gets XGuard's own message
    *  instead, since "Invalid code" would point at an input the user cannot see. */
   hasCodeInput?: boolean;
 };
@@ -96,7 +96,7 @@ export const useMfaConfigErrorHandler = ({
       let message = fallback;
       if (isMfaConfigSmtpNotConfigured(err)) {
         message =
-          'Email MFA is unavailable because SMTP is not configured on this Defguard instance. Contact your administrator.';
+          'Email MFA is unavailable because SMTP is not configured on this XGuard instance. Contact your administrator.';
       } else if (isMfaConfigProxyError(err)) {
         message =
           'Could not complete MFA configuration. Please try again or contact your administrator.';

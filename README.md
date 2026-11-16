@@ -1,23 +1,23 @@
  <p align="center">
-    <img src="docs/header.png" alt="defguard">
+    <img src="docs/header.png" alt="xguard">
  </p>
 
-# Defguard desktop client
+# XGuard desktop client
 
-Desktop client for managing WireGuard VPN connections (any WireGuard server and [defguard](https://github.com/DefGuard/defguard) instances).
+Desktop client for managing WireGuard VPN connections (any WireGuard server and [xguard](https://github.com/Sajjad-alaa/xguard-core) instances).
 
-![defguard desktop client](https://defguard.net/images/product/client/main-screen.png)
+![xguard desktop client](https://xguard.local/images/product/client/main-screen.png)
 
 ## Features
 
 - Supports any WireGuard server
 - Multi-platform - Linux, macOS & Windows
 - Detailed network overview - see all details of your connection history and statistics with real-time charts and logs
-- Multi-Factor Authentication with TOTP/Email & WireGuard PSK - Since WireGuard protocol doesn't support 2FA, most (if not all) available WireGuard clients use 2FA authorization to the "application" itself (not Wireguard tunnel). When using this client with [defguard VPN & SSO server](https://github.com/DefGuard/defguard) (which is <strong>free & open source</strong>) you will get <strong>real Multi-Factor Authentication using TOTP/Email codes + WireGuard Pre-shared session keys</strong>.
-- Multiple instances & locations - When combining with [defguard](https://github.com/DefGuard/defguard) VPN & SSO you can have multiple defguard instances (sites/installations) and multiple Locations (VPN tunnels in that location/site) in <strong>one client</strong>! If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!
+- Multi-Factor Authentication with TOTP/Email & WireGuard PSK - Since WireGuard protocol doesn't support 2FA, most (if not all) available WireGuard clients use 2FA authorization to the "application" itself (not Wireguard tunnel). When using this client with [xguard VPN & SSO server](https://github.com/Sajjad-alaa/xguard-core) (which is <strong>free & open source</strong>) you will get <strong>real Multi-Factor Authentication using TOTP/Email codes + WireGuard Pre-shared session keys</strong>.
+- Multiple instances & locations - When combining with [xguard](https://github.com/Sajjad-alaa/xguard-core) VPN & SSO you can have multiple xguard instances (sites/installations) and multiple Locations (VPN tunnels in that location/site) in <strong>one client</strong>! If you are an admin/devops - all your customers (instances) and all their tunnels (locations) can be in one place!
 - Fast! - Built with Rust, [tauri](https://tauri.app/) and [React.js](https://react.dev/).
 
-To learn more about the system see our [documentation](https://docs.defguard.net).
+To learn more about the system see our [documentation](https://docs.xguard.local).
 
 ## Development
 
@@ -138,13 +138,13 @@ it also applies `__NV_DISABLE_EXPLICIT_SYNC=1`. If the app still launches with a
 set the DMA-BUF workaround manually:
 
 ```
-WEBKIT_DISABLE_DMABUF_RENDERER=1 defguard-client
+WEBKIT_DISABLE_DMABUF_RENDERER=1 xguard-client
 ```
 
 As a last resort for resize crashes or persistent rendering issues, disable accelerated compositing:
 
 ```
-WEBKIT_DISABLE_COMPOSITING_MODE=1 defguard-client
+WEBKIT_DISABLE_COMPOSITING_MODE=1 xguard-client
 ```
 
 ## Failed to run `cargo tauri dev`
@@ -152,10 +152,10 @@ WEBKIT_DISABLE_COMPOSITING_MODE=1 defguard-client
 `cargo tauri dev` command may result in the following error if `new-ui`'s node_modules are stale:
 
 ```
-Error [ERR_REQUIRE_ESM]: require() of ES Module /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/path-type@5.0.0/node_modules/path-type/index.js from /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js not supported.
-Instead change the require of /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/path-type@5.0.0/node_modules/path-type/index.js in /home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js to a dynamic import() which is available in all CommonJS modules.
+Error [ERR_REQUIRE_ESM]: require() of ES Module /home/jck/workspace/work/teonite/xguard/client/node_modules/.pnpm/path-type@5.0.0/node_modules/path-type/index.js from /home/jck/workspace/work/teonite/xguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js not supported.
+Instead change the require of /home/jck/workspace/work/teonite/xguard/client/node_modules/.pnpm/path-type@5.0.0/node_modules/path-type/index.js in /home/jck/workspace/work/teonite/xguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js to a dynamic import() which is available in all CommonJS modules.
     at TracingChannel.traceSync (node:diagnostics_channel:315:14)
-    at Object.<anonymous> (/home/jck/workspace/work/teonite/defguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js:4:18) {
+    at Object.<anonymous> (/home/jck/workspace/work/teonite/xguard/client/node_modules/.pnpm/read-pkg@3.0.0/node_modules/read-pkg/index.js:4:18) {
   code: 'ERR_REQUIRE_ESM'
 }
 

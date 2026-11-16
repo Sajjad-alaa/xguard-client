@@ -1,4 +1,4 @@
-use defguard_core::database::models::{instance::Instance, tunnel::Tunnel, Id};
+use xguard_core::database::models::{instance::Instance, tunnel::Tunnel, Id};
 use serde_json::{json, Value};
 
 use crate::{

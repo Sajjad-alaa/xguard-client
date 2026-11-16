@@ -293,7 +293,7 @@ describe('useMfaMobileConnect', () => {
     });
 
     expect(mocks.onConnectionError).toHaveBeenCalledWith(
-      'Your Defguard mobile app is out of date.\nUpgrade to approve this connection.',
+      'Your XGuard mobile app is out of date.\nUpgrade to approve this connection.',
       'disable-mfa',
     );
     expect(result.current.connectionError).toBeNull();

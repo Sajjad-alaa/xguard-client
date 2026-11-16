@@ -30,7 +30,7 @@ env:
 jobs:
   test:
     runs-on:
-      - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
+      - codebuild-xguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
 
     container:
       image: public.ecr.aws/docker/library/rust:1

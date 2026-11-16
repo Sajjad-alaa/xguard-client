@@ -296,7 +296,7 @@ mod unit_tests {
             mount("/var/lib", "/dev/sda3"),
         ];
         assert_eq!(
-            find_backing_mount(&mounts, Path::new("/var/lib/defguard/db"))
+            find_backing_mount(&mounts, Path::new("/var/lib/xguard/db"))
                 .map(|m| m.source.as_str()),
             Some("/dev/sda3")
         );
@@ -380,7 +380,7 @@ mod unit_tests {
         // A deep non-existent DB path resolves to its nearest existing ancestor
         // (the default app dir does not exist before first run).
         let base = std::env::temp_dir();
-        let deep = base.join("defguard-posture-nonexistent-xyz/a/b/defguard.db");
+        let deep = base.join("xguard-posture-nonexistent-xyz/a/b/xguard.db");
         assert_eq!(canonicalize_on_disk(&deep), base.canonicalize().ok());
     }
 }

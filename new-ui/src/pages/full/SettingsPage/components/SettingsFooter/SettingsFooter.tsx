@@ -5,11 +5,11 @@ import { Icon, IconKind } from '../../../../../shared/components/Icon';
 export const SettingsFooter = () => {
   return (
     <p className="settings-footer">
-      Defguard is made possible by other open-source software.{' '}
+      XGuard is made possible by other open-source software.{' '}
       <button
         type="button"
         className="link"
-        onClick={() => openUrl('https://docs.defguard.net/')}
+        onClick={() => openUrl('https://docs.xguard.local/')}
       >
         Learn more here
         <Icon icon={IconKind.OpenInNewWindow} size={14} />

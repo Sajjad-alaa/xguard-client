@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use defguard_client_core::{
+use xguard_client_core::{
     database::models::{
         instance::{ClientTrafficPolicy, MfaCapabilities, OpenIdProviderKind},
         location::{Location, LocationMfaMethod, LocationMfaMode, ServiceLocationMode},
@@ -14,7 +14,7 @@ use defguard_client_core::{
     },
     mfa_contract::MfaContract,
 };
-use defguard_client_proto::defguard::client_types::{
+use xguard_client_proto::xguard::client_types::{
     DeviceConfig, DeviceConfigResponse, InstanceInfo, MfaCapabilities as ProtoMfaCapabilities,
     MfaMethod, MfaUserState,
 };
@@ -406,7 +406,7 @@ async fn test_poll_rejects_missing_instance_info(pool: SqlitePool) {
 
     assert!(matches!(
         error,
-        defguard_client_core::error::Error::InternalError(message)
+        xguard_client_core::error::Error::InternalError(message)
             if message == "Instance info not present in response"
     ));
     assert_eq!(instance.mfa_contract, MfaContract::MultiStep);

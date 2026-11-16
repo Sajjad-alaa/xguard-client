@@ -1,4 +1,4 @@
-pub use defguard_client_core::events::EventKey;
+pub use xguard_client_core::events::EventKey;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_notification::NotificationExt;

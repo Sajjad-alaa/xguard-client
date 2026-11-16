@@ -54,11 +54,11 @@ export const SupportPage = () => {
         <SupportSection
           icon={IconKind.Question}
           title="Have questions? Check our documentation first."
-          description="Before contacting or submitting any issues to GitHub please get familiar with Defguard documentation available."
+          description="Before contacting or submitting any issues to GitHub please get familiar with XGuard documentation available."
           action={{
             text: 'Go to documentation',
             iconRight: IconKind.OpenInNewWindow,
-            onClick: () => openUrl('https://docs.defguard.net/'),
+            onClick: () => openUrl('https://docs.xguard.local/'),
           }}
         />
         <SupportSection
@@ -71,7 +71,7 @@ export const SupportPage = () => {
             variant: ButtonVariant.Secondary,
             onClick: () =>
               openUrl(
-                'https://github.com/DefGuard/client/issues/new?template=02-bug.yml',
+                'https://github.com/Sajjad-alaa/xguard-client/issues/new?template=02-bug.yml',
               ),
           }}
         />
@@ -85,14 +85,14 @@ export const SupportPage = () => {
             variant: ButtonVariant.Secondary,
             onClick: () =>
               openUrl(
-                'https://github.com/DefGuard/client/issues/new?template=01-feature-request.yml',
+                'https://github.com/Sajjad-alaa/xguard-client/issues/new?template=01-feature-request.yml',
               ),
           }}
         />
         <SupportSection
           icon={IconKind.Mail}
           title="Have questions? Check our documentation first."
-          description="You can contact us for any other requests at support@defguard.net."
+          description="You can contact us for any other requests at support@xguard.local."
           divider={false}
         />
       </div>

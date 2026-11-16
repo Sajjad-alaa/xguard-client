@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use defguard_core::database::models::{
+use xguard_core::database::models::{
     instance::{ClientTrafficPolicy, Instance},
     location::{Location, LocationMfaMethod, LocationMfaStep},
     Id,

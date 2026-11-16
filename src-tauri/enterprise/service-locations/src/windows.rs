@@ -8,12 +8,12 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use defguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
-use defguard_client_proto::{
+use xguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
+use xguard_client_proto::{
     conversions::normalize_allowed_ips,
-    defguard::client::v1::{SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode},
+    xguard::client::v1::{SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode},
 };
-use defguard_wireguard_rs::{
+use xguard_wireguard_rs::{
     key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
 use known_folders::get_known_folder_path;
@@ -45,7 +45,7 @@ const NETWORK_STABILIZATION_DELAY: Duration = Duration::from_secs(3);
 // How long to wait before restarting the network change watcher on error.
 const NETWORK_CHANGE_MONITOR_RESTART_DELAY: Duration = Duration::from_secs(5);
 const DEFAULT_WIREGUARD_PORT: u16 = 51820;
-const DEFGUARD_DIR: &str = "Defguard";
+const XGUARD_DIR: &str = "XGuard";
 const SERVICE_LOCATIONS_SUBDIR: &str = "service_locations";
 
 /// Watches for IP address changes on any network interface and attempts to connect to any
@@ -174,7 +174,7 @@ fn interface_configuration(
 fn get_shared_directory() -> Result<PathBuf, ServiceLocationError> {
     match get_known_folder_path(known_folders::KnownFolder::ProgramData) {
         Some(mut path) => {
-            path.push(DEFGUARD_DIR);
+            path.push(XGUARD_DIR);
             path.push(SERVICE_LOCATIONS_SUBDIR);
             Ok(path)
         }

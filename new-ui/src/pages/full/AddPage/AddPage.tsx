@@ -23,7 +23,7 @@ export const AddPage = () => {
 
   return (
     <FullPage id="add-page-view" hideScrollContainer>
-      <FullPageTitle title="Add Defguard items" spacing={ThemeSpacing.Xl} />
+      <FullPageTitle title="Add XGuard items" spacing={ThemeSpacing.Xl} />
       <div className="cards">
         <AddCard
           image="default"
@@ -34,7 +34,7 @@ export const AddPage = () => {
           }}
           title="Add Instance"
           actionText="Add instance"
-          description={`Establish a secure connection to your Defguard instance effortlessly by configuring it with a single token—no manual setup.`}
+          description={`Establish a secure connection to your XGuard instance effortlessly by configuring it with a single token—no manual setup.`}
         />
         {!isPending && !tunnelsDisabled(instances ?? []) && (
           <AddCard

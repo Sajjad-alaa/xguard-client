@@ -2,13 +2,13 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <Fragment>
     <DirectoryRef Id="INSTALLDIR">
-      <Component Id="DefguardServiceFragment">
-        <File KeyPath="yes" Id="DefguardServiceFile" Source="..\..\defguard-service.exe" />
+      <Component Id="XGuardServiceFragment">
+        <File KeyPath="yes" Id="XGuardServiceFile" Source="..\..\xguard-service.exe" />
         <ServiceInstall
           Account="LocalSystem"
-          Id="DefguardService"
-          Name="DefguardService"
-          DisplayName="Defguard Service"
+          Id="XGuardService"
+          Name="XGuardService"
+          DisplayName="XGuard Service"
           Type="ownProcess"
           Start="auto"
           ErrorControl="normal"
@@ -21,7 +21,7 @@
             ThirdFailureActionType="restart"
           />
         </ServiceInstall>
-        <ServiceControl Id="DefguardService" Name="DefguardService" Start="install" Stop="both" Remove="uninstall" />
+        <ServiceControl Id="XGuardService" Name="XGuardService" Start="install" Stop="both" Remove="uninstall" />
       </Component>
     </DirectoryRef>
   </Fragment>

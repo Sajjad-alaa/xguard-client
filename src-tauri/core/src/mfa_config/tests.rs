@@ -1163,13 +1163,13 @@ fn test_ensure_can_authorize_method_needs_the_client_and_the_instance() {
 async fn test_proxy_base_path_is_preserved() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
-        .and(path(format!("/defguard/{START}")))
+        .and(path(format!("/xguard/{START}")))
         .respond_with(ResponseTemplate::new(200).set_body_json(start_response_json()))
         .expect(1)
         .mount(&server)
         .await;
 
-    let url = Url::parse(&format!("{}/defguard/", server.uri())).unwrap();
+    let url = Url::parse(&format!("{}/xguard/", server.uri())).unwrap();
 
     mfa_config_start(url, "t".into(), "pk".into())
         .await

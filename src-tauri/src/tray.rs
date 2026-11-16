@@ -1,4 +1,4 @@
-use defguard_client_core::{
+use xguard_client_core::{
     connection::active_connections::{get_connection_id_by_type, ACTIVE_CONNECTIONS},
     connection_ability::{connection_ability, ConnectionAbility, InstanceMfaState},
     database::models::{instance::InstanceInfo, Id},
@@ -23,9 +23,9 @@ use crate::{
     ConnectionType,
 };
 
-const SUBSCRIBE_UPDATES_LINK: &str = "https://defguard.net/newsletter";
-const JOIN_COMMUNITY_LINK: &str = "https://github.com/DefGuard/defguard/discussions/new/choose";
-const FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
+const SUBSCRIBE_UPDATES_LINK: &str = "https://xguard.local/newsletter";
+const JOIN_COMMUNITY_LINK: &str = "https://github.com/Sajjad-alaa/xguard-core/discussions/new/choose";
+const FOLLOW_US_LINK: &str = "https://floss.social/@xguard";
 
 const TRAY_ICON_ID: &str = "tray";
 
@@ -94,7 +94,7 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
                     "Found {} locations for the {instance} instance to display in the tray menu",
                     all_locations.len(),
                 );
-                // TODO: Use icons instead of Connect/Disconnect when Defguard utilizes tauri v2.
+                // TODO: Use icons instead of Connect/Disconnect when XGuard utilizes tauri v2.
                 for location in tray_locations(instance, all_locations) {
                     let menu_item = MenuItem::with_id(
                         app,
@@ -119,7 +119,7 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
                         continue;
                     }
 
-                    // TODO: Use icons instead of Connect/Disconnect when Defguard utilizes tauri v2.
+                    // TODO: Use icons instead of Connect/Disconnect when XGuard utilizes tauri v2.
                     for location in locations {
                         let menu_item = MenuItem::with_id(
                             app,

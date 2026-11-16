@@ -1,4 +1,4 @@
-use defguard_client_core::version::mark_welcome_shown;
+use xguard_client_core::version::mark_welcome_shown;
 use tauri::{
     async_runtime::block_on, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
@@ -47,11 +47,11 @@ pub const FULL_VIEW_WINDOW_WIDTH: f64 = 800.0;
 pub const FULL_VIEW_WINDOW_HEIGHT: f64 = 700.0;
 #[cfg(not(target_os = "linux"))]
 const WINDOW_GAP: f64 = 20.0;
-const WINDOW_TITLE: &str = "Defguard";
+const WINDOW_TITLE: &str = "XGuard";
 
 #[must_use]
 pub fn compact_view_ui_url() -> WebviewUrl {
-    if cfg!(any(defguard_client_dev)) {
+    if cfg!(any(xguard_client_dev)) {
         WebviewUrl::External("http://localhost:5072/compact/".parse().unwrap())
     } else {
         WebviewUrl::App("compact/".into())
@@ -60,7 +60,7 @@ pub fn compact_view_ui_url() -> WebviewUrl {
 
 #[must_use]
 pub fn full_view_ui_url() -> WebviewUrl {
-    if cfg!(any(defguard_client_dev)) {
+    if cfg!(any(xguard_client_dev)) {
         WebviewUrl::External("http://localhost:5072/full/".parse().unwrap())
     } else {
         WebviewUrl::App("full/".into())
@@ -69,7 +69,7 @@ pub fn full_view_ui_url() -> WebviewUrl {
 
 #[must_use]
 pub fn welcome_ui_url() -> WebviewUrl {
-    if cfg!(any(defguard_client_dev)) {
+    if cfg!(any(xguard_client_dev)) {
         WebviewUrl::External("http://localhost:5072/welcome/".parse().unwrap())
     } else {
         WebviewUrl::App("welcome/".into())

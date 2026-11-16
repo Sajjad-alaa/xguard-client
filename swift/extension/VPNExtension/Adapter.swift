@@ -66,7 +66,7 @@ private struct PathSignature: Equatable {
     /// Consecutive reconnection attempts.
     private var reconnectAttempts = 0
     /// Serialize tunnel I/O and connection state changes off the main queue.
-    private let ioQueue = DispatchQueue(label: "net.defguard.VPNExtension.adapter")
+    private let ioQueue = DispatchQueue(label: "local.xguard.VPNExtension.adapter")
     private let ioQueueKey = DispatchSpecificKey<Void>()
 
     /// For statistics returned to Rust code.

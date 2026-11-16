@@ -1,4 +1,4 @@
-use defguard_core::{
+use xguard_core::{
     connection::{active_state::active_state, tear_down},
     ConnectionType,
 };

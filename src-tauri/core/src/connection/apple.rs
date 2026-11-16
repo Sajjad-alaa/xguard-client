@@ -36,7 +36,7 @@ use crate::{
     ConnectionType,
 };
 
-pub const PLUGIN_BUNDLE_ID: &str = "net.defguard.VPNExtension";
+pub const PLUGIN_BUNDLE_ID: &str = "local.xguard.VPNExtension";
 pub const LOCATION_ID: &str = "locationId";
 pub const TUNNEL_ID: &str = "tunnelId";
 

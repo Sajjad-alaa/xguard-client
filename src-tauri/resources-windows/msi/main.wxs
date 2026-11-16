@@ -154,13 +154,13 @@
                 {{/each~}}
             </Component>
             {{#if enable_elevated_update_task}}
-            <Component Id="UpdateTask" Guid="C492327D-9720-4CD5-8DB8-F09082AF44BE" Win64="$(var.Win64)">
+            <Component Id="UpdateTask" Guid="6BDE2ACB-9C4E-41D3-8E79-0294D6A9B393" Win64="$(var.Win64)">
                 <File Id="UpdateTask" Source="update.xml" KeyPath="yes" Checksum="yes"/>
             </Component>
-            <Component Id="UpdateTaskInstaller" Guid="011F25ED-9BE3-50A7-9E9B-3519ED2B9932" Win64="$(var.Win64)">
+            <Component Id="UpdateTaskInstaller" Guid="363D6E50-53CE-43B2-97D2-B4DC7C9F05FC" Win64="$(var.Win64)">
                 <File Id="UpdateTaskInstaller" Source="install-task.ps1" KeyPath="yes" Checksum="yes"/>
             </Component>
-            <Component Id="UpdateTaskUninstaller" Guid="D4F6CC3F-32DC-5FD0-95E8-782FFD7BBCE1" Win64="$(var.Win64)">
+            <Component Id="UpdateTaskUninstaller" Guid="5A73FBE5-3EA2-4480-8DF3-F5690DD3F558" Win64="$(var.Win64)">
                 <File Id="UpdateTaskUninstaller" Source="uninstall-task.ps1" KeyPath="yes" Checksum="yes"/>
             </Component>
             {{/if}}

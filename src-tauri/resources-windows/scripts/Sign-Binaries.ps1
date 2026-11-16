@@ -6,8 +6,8 @@ $windowsConfig = $tauriConfig.bundle.windows
 
 $thumbprint = $windowsConfig.certificateThumbprint
 
-$timestampUrl = if ($env:DEFGUARD_WINDOWS_TIMESTAMP_URL) {
-    $env:DEFGUARD_WINDOWS_TIMESTAMP_URL
+$timestampUrl = if ($env:XGUARD_WINDOWS_TIMESTAMP_URL) {
+    $env:XGUARD_WINDOWS_TIMESTAMP_URL
 } else {
     $windowsConfig.timestampUrl
 }
@@ -45,15 +45,15 @@ if ($env:TAURI_ENV_TARGET_TRIPLE) {
     $candidates += Join-Path (Join-Path $targetDir $env:TAURI_ENV_TARGET_TRIPLE) $profileName
 }
 $outDir = $candidates |
-    Where-Object { Test-Path (Join-Path $_ 'defguard-client.exe') } |
-    Sort-Object { (Get-Item (Join-Path $_ 'defguard-client.exe')).LastWriteTime } -Descending |
+    Where-Object { Test-Path (Join-Path $_ 'xguard-client.exe') } |
+    Sort-Object { (Get-Item (Join-Path $_ 'xguard-client.exe')).LastWriteTime } -Descending |
     Select-Object -First 1
 if (-not $outDir) {
-    throw "defguard-client.exe not found in: $($candidates -join ', ')"
+    throw "xguard-client.exe not found in: $($candidates -join ', ')"
 }
 
 $binaries = @(
-    (Join-Path $outDir 'defguard-service.exe')
+    (Join-Path $outDir 'xguard-service.exe')
 )
 
 foreach ($binary in $binaries) {

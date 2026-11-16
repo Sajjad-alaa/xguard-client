@@ -6,7 +6,7 @@ import { SelectionItemVariant } from '../../../../shared/components/SelectionIte
 import { PlaygroundCard } from '../PlaygroundCard/PlaygroundCard';
 import { PlaygroundGroup } from '../PlaygroundGroup/PlaygroundGroup';
 
-const radioItems = ['defguard.example.com', 'vpn.example.org'];
+const radioItems = ['xguard.example.com', 'vpn.example.org'];
 const checkboxItems = ['Office network', 'Staging cluster'];
 
 export const PlaygroundTestSelectionItem = () => {

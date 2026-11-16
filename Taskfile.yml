@@ -15,8 +15,8 @@ tasks:
     dir: src-tauri
     env:
       DATABASE_URL: sqlite:dev.db
-      DEFGUARD_CLIENT_DEV: '1'
-      DEFGUARD_CLIENT_LOG_LEVEL: debug
+      XGUARD_CLIENT_DEV: '1'
+      XGUARD_CLIENT_LOG_LEVEL: debug
     cmd: cargo tauri dev
 
   dev-welcome:
@@ -24,9 +24,9 @@ tasks:
     dir: src-tauri
     env:
       DATABASE_URL: sqlite:dev.db
-      DEFGUARD_CLIENT_DEV: '1'
-      DEFGUARD_CLIENT_LOG_LEVEL: debug
-      DEFGUARD_CLIENT_WELCOME_FORCE: '1'
+      XGUARD_CLIENT_DEV: '1'
+      XGUARD_CLIENT_LOG_LEVEL: debug
+      XGUARD_CLIENT_WELCOME_FORCE: '1'
     cmd: cargo tauri dev
 
   dev-web:
@@ -74,14 +74,14 @@ tasks:
     cmd: pnpm provision
 
   e2e-test:
-    desc: Run the Linux WebDriver suite. Core, Edge, gateway and defguard-service are external prerequisites.
+    desc: Run the Linux WebDriver suite. Core, Edge, gateway and xguard-service are external prerequisites.
     platforms: [linux]
     dir: e2e
     preconditions:
       - sh: test -f .env
         msg: Missing e2e/.env, copy e2e/.env.example and fill it locally.
-      - sh: test -S /var/run/defguard.socket
-        msg: defguard-service is not running at /var/run/defguard.socket.
+      - sh: test -S /var/run/xguard.socket
+        msg: xguard-service is not running at /var/run/xguard.socket.
       - sh: test -x "${TAURI_DRIVER:-$HOME/.cargo/bin/tauri-driver}"
         msg: tauri-driver is missing, set TAURI_DRIVER to its location.
       - sh: command -v WebKitWebDriver

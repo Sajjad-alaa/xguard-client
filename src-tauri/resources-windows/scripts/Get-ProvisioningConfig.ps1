@@ -2,22 +2,22 @@
 
 <#
 .SYNOPSIS
-    Retrieves Defguard client provisioning configuration for the currently logged-in user from Active Directory or Entra ID.
+    Retrieves XGuard client provisioning configuration for the currently logged-in user from Active Directory or Entra ID.
 
 .DESCRIPTION
     This script detects whether the computer is joined to on-premises Active Directory 
-    or Entra ID (Azure AD), then fetches Defguard provisioning data (URL and enrollment token) from the appropriate source.
-    - On-premises AD: Reads from specified attribute (default: defguardProvisioningConfig)
-    - Entra ID: Reads from custom security attributes under the 'Defguard' set
+    or Entra ID (Azure AD), then fetches XGuard provisioning data (URL and enrollment token) from the appropriate source.
+    - On-premises AD: Reads from specified attribute (default: xguardProvisioningConfig)
+    - Entra ID: Reads from custom security attributes under the 'XGuard' set
     - Workgroup: Exits gracefully
-    The retrieved enrollment data is saved to a JSON file for the Defguard client to use.
+    The retrieved enrollment data is saved to a JSON file for the XGuard client to use.
 
 .PARAMETER ADAttribute
-    Specifies which Active Directory attribute to read from (default: defguardProvisioningConfig)
+    Specifies which Active Directory attribute to read from (default: xguardProvisioningConfig)
 #>
 
 param(
-    [string]$ADAttribute = "defguardProvisioningConfig"
+    [string]$ADAttribute = "xguardProvisioningConfig"
 )
 
 # Check device join status
@@ -66,22 +66,22 @@ function Get-DomainJoinStatus {
     }
 }
 
-# Save Defguard enrollment data to JSON
-function Save-DefguardEnrollmentData {
+# Save XGuard enrollment data to JSON
+function Save-XGuardEnrollmentData {
     param(
         [string]$EnrollmentUrl,
         [string]$EnrollmentToken
     )
     
-    # Create Defguard directory in AppData\Roaming
-    $defguardDir = Join-Path $env:APPDATA "net.defguard"
-    $jsonOutputPath = Join-Path $defguardDir "provisioning.json"
+    # Create XGuard directory in AppData\Roaming
+    $xguardDir = Join-Path $env:APPDATA "local.xguard"
+    $jsonOutputPath = Join-Path $xguardDir "provisioning.json"
     
     try {
         # Create directory if it doesn't exist
-        if (-not (Test-Path -Path $defguardDir)) {
-            New-Item -ItemType Directory -Path $defguardDir -Force | Out-Null
-            Write-Host "`nCreated directory: $defguardDir" -ForegroundColor Gray
+        if (-not (Test-Path -Path $xguardDir)) {
+            New-Item -ItemType Directory -Path $xguardDir -Force | Out-Null
+            Write-Host "`nCreated directory: $xguardDir" -ForegroundColor Gray
         }
         
         $jsonData = @{
@@ -90,7 +90,7 @@ function Save-DefguardEnrollmentData {
         }
         
         $jsonData | ConvertTo-Json -Depth 10 | Out-File -FilePath $jsonOutputPath -Encoding UTF8 -Force
-        Write-Host "`nDefguard enrollment data saved to: $jsonOutputPath" -ForegroundColor Green
+        Write-Host "`nXGuard enrollment data saved to: $jsonOutputPath" -ForegroundColor Green
         return $true
     } catch {
         Write-Host "`nFailed to save JSON file: $_" -ForegroundColor Red
@@ -98,7 +98,7 @@ function Save-DefguardEnrollmentData {
     }
 }
 
-# Get Defguard client provisioning config from on-premises AD
+# Get XGuard client provisioning config from on-premises AD
 function Get-OnPremisesADProvisioningConfig {
     param(
         [string]$Username,
@@ -134,13 +134,13 @@ function Get-OnPremisesADProvisioningConfig {
         Write-Host "Distinguished Name:  $($adUser.DistinguishedName)"
         Write-Host "======================================================`n" -ForegroundColor Cyan
 
-        # Check for Defguard enrollment data in the specified AD attribute
+        # Check for XGuard enrollment data in the specified AD attribute
         Write-Host "`n--- Active Directory Attribute ---" -ForegroundColor Yellow
         
         # Read JSON data from the specified AD attribute
         $jsonData = $adUser.$ADAttribute
         
-        Write-Host "Defguard Enrollment JSON ($ADAttribute): $jsonData"
+        Write-Host "XGuard Enrollment JSON ($ADAttribute): $jsonData"
         
         if ($jsonData) {
             try {
@@ -151,22 +151,22 @@ function Get-OnPremisesADProvisioningConfig {
                 $enrollmentUrl = $enrollmentConfig.enrollmentUrl
                 $enrollmentToken = $enrollmentConfig.enrollmentToken
                 
-                Write-Host "Defguard Enrollment URL:   $enrollmentUrl"
-                Write-Host "Defguard Enrollment Token: $enrollmentToken"
+                Write-Host "XGuard Enrollment URL:   $enrollmentUrl"
+                Write-Host "XGuard Enrollment Token: $enrollmentToken"
                 
                 # Save enrollment data to JSON file only if both URL and token exist
                 if ($enrollmentUrl -and $enrollmentToken) {
-                    Save-DefguardEnrollmentData -EnrollmentUrl $enrollmentUrl `
+                    Save-XGuardEnrollmentData -EnrollmentUrl $enrollmentUrl `
                                                  -EnrollmentToken $enrollmentToken
                 } else {
-                    Write-Host "`nWarning: Incomplete Defguard enrollment data in JSON. Both URL and token are required." -ForegroundColor Yellow
+                    Write-Host "`nWarning: Incomplete XGuard enrollment data in JSON. Both URL and token are required." -ForegroundColor Yellow
                 }
             } catch {
                 Write-Host "Failed to parse JSON from AD attribute '$ADAttribute': $_" -ForegroundColor Red
                 Write-Host "JSON data should be in format: {`"enrollmentUrl`":`"https://...`",`"enrollmentToken`":`"token-value`"}" -ForegroundColor Yellow
             }
         } else {
-            Write-Host "No Defguard enrollment data found in the specified AD attribute." -ForegroundColor Yellow
+            Write-Host "No XGuard enrollment data found in the specified AD attribute." -ForegroundColor Yellow
         }
         
         Write-Host "======================================================`n" -ForegroundColor Cyan
@@ -180,7 +180,7 @@ function Get-OnPremisesADProvisioningConfig {
     }
 }
 
-# Get Defguard client provisioning config from Entra ID
+# Get XGuard client provisioning config from Entra ID
 function Get-EntraIDProvisioningConfig {
     # Check if Microsoft.Graph module is available
     if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.Users)) {
@@ -242,26 +242,26 @@ function Get-EntraIDProvisioningConfig {
         if ($mgUser.CustomSecurityAttributes) {
             Write-Host "`n--- Custom Security Attributes ---" -ForegroundColor Yellow
             
-            # Access Defguard attributes
+            # Access XGuard attributes
             if ($mgUser.CustomSecurityAttributes.AdditionalProperties) {
-                $defguardAttrs = $mgUser.CustomSecurityAttributes.AdditionalProperties["Defguard"]
+                $xguardAttrs = $mgUser.CustomSecurityAttributes.AdditionalProperties["XGuard"]
                 
-                if ($defguardAttrs) {
-                    $enrollmentUrl = $defguardAttrs["EnrollmentUrl"]
-                    $enrollmentToken = $defguardAttrs["EnrollmentToken"]
+                if ($xguardAttrs) {
+                    $enrollmentUrl = $xguardAttrs["EnrollmentUrl"]
+                    $enrollmentToken = $xguardAttrs["EnrollmentToken"]
                     
-                    Write-Host "Defguard Enrollment URL:   $enrollmentUrl"
-                    Write-Host "Defguard Enrollment Token: $enrollmentToken"
+                    Write-Host "XGuard Enrollment URL:   $enrollmentUrl"
+                    Write-Host "XGuard Enrollment Token: $enrollmentToken"
 
                     # Save enrollment data to JSON file only if both URL and token exist
                     if ($enrollmentUrl -and $enrollmentToken) {
-                        Save-DefguardEnrollmentData -EnrollmentUrl $enrollmentUrl `
+                        Save-XGuardEnrollmentData -EnrollmentUrl $enrollmentUrl `
                                                      -EnrollmentToken $enrollmentToken
                     } else {
-                        Write-Host "`nWarning: Incomplete Defguard enrollment data. Both URL and token are required." -ForegroundColor Yellow
+                        Write-Host "`nWarning: Incomplete XGuard enrollment data. Both URL and token are required." -ForegroundColor Yellow
                     }
                 } else {
-                    Write-Host "No Defguard attributes found for this user." -ForegroundColor Gray
+                    Write-Host "No XGuard attributes found for this user." -ForegroundColor Gray
                 }
             } else {
                 Write-Host "No custom security attributes found." -ForegroundColor Gray
@@ -280,8 +280,8 @@ function Get-EntraIDProvisioningConfig {
 }
 
 # Log all script output to file
-$defguardDir = Join-Path $env:APPDATA "net.defguard"
-$logFilePath = Join-Path $defguardDir "provisioning_log.txt"
+$xguardDir = Join-Path $env:APPDATA "local.xguard"
+$logFilePath = Join-Path $xguardDir "provisioning_log.txt"
 Start-Transcript -Path $logFilePath
 
 # Main script execution

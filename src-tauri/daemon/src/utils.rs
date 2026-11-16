@@ -14,8 +14,8 @@ use tracing_subscriber::{
     Layer,
 };
 
-const SERVICE_LOG_PREFIX: &str = "defguard-service";
-const OLD_SERVICE_LOG_PREFIX: &str = "defguard-service.log.";
+const SERVICE_LOG_PREFIX: &str = "xguard-service";
+const OLD_SERVICE_LOG_PREFIX: &str = "xguard-service.log.";
 
 #[derive(Debug, thiserror::Error)]
 pub enum LoggingSetupError {

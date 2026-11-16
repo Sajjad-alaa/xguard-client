@@ -30,7 +30,7 @@
 
   craneLib = crane.mkLib pkgs;
 
-  defguard-client = pkgs.callPackage ./package.nix {
+  xguard-client = pkgs.callPackage ./package.nix {
     inherit craneLib;
     cargo = rustToolchain;
     rustc = rustToolchain;
@@ -43,7 +43,7 @@
 in
   pkgs.mkShell {
     # inherit build inputs from the package
-    inputsFrom = [defguard-client];
+    inputsFrom = [xguard-client];
 
     # add additional dev tools
     packages = with pkgs;

@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-GROUP_NAME="defguard"
-SERVICE_NAME="defguard-service"
+GROUP_NAME="xguard"
+SERVICE_NAME="xguard-service"
 
 case "$1" in
     1)

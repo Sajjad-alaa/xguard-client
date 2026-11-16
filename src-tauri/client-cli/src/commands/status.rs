@@ -1,4 +1,4 @@
-use defguard_core::connection::active_state::{active_state, ActiveConnectionInfo};
+use xguard_core::connection::active_state::{active_state, ActiveConnectionInfo};
 use serde_json::{json, Value};
 
 use crate::{
@@ -129,7 +129,7 @@ fn format_handshake(secs: u64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use defguard_core::{connection::active_state::InterfaceStats, ConnectionType};
+    use xguard_core::{connection::active_state::InterfaceStats, ConnectionType};
 
     use super::*;
 

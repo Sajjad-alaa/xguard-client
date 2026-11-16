@@ -1,6 +1,6 @@
 [package]
-name = "defguard-client-fido2"
-description = "FIDO2 security key ceremonies for the Defguard desktop client (Tauri-free)"
+name = "xguard-client-fido2"
+description = "FIDO2 security key ceremonies for the XGuard desktop client (Tauri-free)"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true

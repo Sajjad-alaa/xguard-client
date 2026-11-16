@@ -9,12 +9,12 @@ use std::{
 #[cfg(unix)]
 use std::{fs, path::Path};
 
-use defguard_client_common::dns_borrow;
+use xguard_client_common::dns_borrow;
 #[cfg(windows)]
-use defguard_client_posture::inspector::{device_posture_data, DiskEncryptionTarget};
-use defguard_client_proto::{
+use xguard_client_posture::inspector::{device_posture_data, DiskEncryptionTarget};
+use xguard_client_proto::{
     conversions::normalize_allowed_ips,
-    defguard::{
+    xguard::{
         client::v1::{
             desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
             CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
@@ -25,15 +25,15 @@ use defguard_client_proto::{
     },
 };
 #[cfg(target_os = "linux")]
-use defguard_client_service_locations::reconciler::{run_reconciler, ReconcileSignal};
-use defguard_client_service_locations::ServiceLocationError;
+use xguard_client_service_locations::reconciler::{run_reconciler, ReconcileSignal};
+use xguard_client_service_locations::ServiceLocationError;
 #[cfg(any(windows, target_os = "linux"))]
-use defguard_client_service_locations::{validate_instance_id, ServiceLocationManager};
+use xguard_client_service_locations::{validate_instance_id, ServiceLocationManager};
 #[cfg(not(target_os = "macos"))]
-use defguard_wireguard_rs::Kernel;
+use xguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
-use defguard_wireguard_rs::Userspace;
-use defguard_wireguard_rs::{
+use xguard_wireguard_rs::Userspace;
+use xguard_wireguard_rs::{
     error::WireguardInterfaceError, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
 };
 #[cfg(target_os = "linux")]
@@ -62,10 +62,10 @@ use crate::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
 use crate::{config::Config, VERSION};
 
 #[cfg(unix)]
-pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
+pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/xguard.socket";
 
 #[cfg(target_os = "linux")]
-pub(super) const DAEMON_SOCKET_GROUP: &str = "defguard";
+pub(super) const DAEMON_SOCKET_GROUP: &str = "xguard";
 
 /// How often the reconciler brings running tunnels back in line with what is on disk.
 ///
@@ -623,7 +623,7 @@ impl DesktopDaemonService for DaemonService {
 
 #[cfg(unix)]
 pub async fn run_server(config: Config) -> anyhow::Result<()> {
-    debug!("Starting Defguard interface management daemon");
+    debug!("Starting XGuard interface management daemon");
 
     #[cfg(target_os = "linux")]
     let mut interrupt = signal(SignalKind::interrupt())?;
@@ -680,11 +680,11 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 
     let uds_stream = UnixListenerStream::new(uds);
 
-    info!("Defguard daemon version {VERSION} started, listening on socket {DAEMON_SOCKET_PATH}",);
-    debug!("Defguard daemon configuration: {config:?}");
+    info!("XGuard daemon version {VERSION} started, listening on socket {DAEMON_SOCKET_PATH}",);
+    debug!("XGuard daemon configuration: {config:?}");
 
     let server = Server::builder()
-        .trace_fn(|_| tracing::info_span!("defguard_client_service"))
+        .trace_fn(|_| tracing::info_span!("xguard_client_service"))
         .add_service(DesktopDaemonServiceServer::from_arc(Arc::clone(
             &daemon_service,
         )));
@@ -705,11 +705,11 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 
         let reason = tokio::select! {
             _ = interrupt.recv() => {
-                info!("Received SIGINT, stopping Defguard daemon");
+                info!("Received SIGINT, stopping XGuard daemon");
                 ShutdownReason::Signal
             }
             _ = terminate.recv() => {
-                info!("Received SIGTERM, stopping Defguard daemon");
+                info!("Received SIGTERM, stopping XGuard daemon");
                 ShutdownReason::Signal
             }
             result = &mut reconciler_handle => ShutdownReason::Reconciler(result),
@@ -760,16 +760,16 @@ pub(crate) async fn run_server(
     config: Config,
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
 ) -> anyhow::Result<()> {
-    debug!("Starting Defguard interface management daemon");
+    debug!("Starting XGuard interface management daemon");
 
     let stream = get_named_pipe_server_stream();
     let daemon_service = DaemonService::new(&config, service_location_manager);
 
-    info!("Defguard daemon version {VERSION} started, listening on named pipe {PIPE_NAME}");
-    debug!("Defguard daemon configuration: {config:?}");
+    info!("XGuard daemon version {VERSION} started, listening on named pipe {PIPE_NAME}");
+    debug!("XGuard daemon configuration: {config:?}");
 
     Server::builder()
-        .trace_fn(|_| tracing::info_span!("defguard_client_service"))
+        .trace_fn(|_| tracing::info_span!("xguard_client_service"))
         .add_service(DesktopDaemonServiceServer::new(daemon_service))
         .serve_with_incoming(stream)
         .await?;

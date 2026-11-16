@@ -1485,362 +1485,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "092966b41edc516079bdf31ec78a2e0588d1d0c08f78b91d8307215928642b2b"
 
 [[package]]
-name = "defguard-cli"
-version = "2.2.0"
-dependencies = [
- "base64 0.23.1",
- "chrono",
- "clap",
- "defguard-client-common",
- "defguard-client-config-sync",
- "defguard-client-core",
- "defguard-client-posture",
- "defguard-client-proto",
- "image",
- "owo-colors",
- "qrcode",
- "secrecy",
- "serde",
- "serde_json",
- "sqlx",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tonic",
- "tracing",
- "tracing-subscriber",
- "url",
- "webbrowser",
-]
-
-[[package]]
-name = "defguard-client"
-version = "2.2.0"
-dependencies = [
- "async-stream",
- "auto-launch",
- "base64 0.23.1",
- "block2",
- "chrono",
- "defguard-cli",
- "defguard-client-common",
- "defguard-client-config-sync",
- "defguard-client-core",
- "defguard-client-fido2",
- "defguard-client-posture",
- "defguard-client-proto",
- "defguard-client-provisioning",
- "defguard_wireguard_rs",
- "dispatch2",
- "futures-core",
- "known-folders",
- "log",
- "nix",
- "objc2",
- "objc2-app-kit",
- "objc2-foundation",
- "objc2-network-extension",
- "objc2-system-extensions",
- "prost",
- "regex",
- "reqwest 0.13.5",
- "rust-ini",
- "serde",
- "serde_json",
- "serde_with",
- "sqlx",
- "struct-patch",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-clipboard-manager",
- "tauri-plugin-deep-link",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-http",
- "tauri-plugin-log",
- "tauri-plugin-notification",
- "tauri-plugin-opener",
- "tauri-plugin-os",
- "tauri-plugin-process",
- "tauri-plugin-single-instance",
- "tempfile",
- "thiserror 2.0.21",
- "time",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tonic",
- "tonic-prost",
- "tracing",
- "uuid",
- "vergen-git2",
- "webbrowser",
- "windows",
- "windows-acl",
- "windows-service",
- "windows-sys 0.61.2",
- "wiremock",
- "wmi",
-]
-
-[[package]]
-name = "defguard-client-common"
-version = "2.2.0"
-dependencies = [
- "nix",
- "vergen-git2",
-]
-
-[[package]]
-name = "defguard-client-config-sync"
-version = "2.2.0"
-dependencies = [
- "defguard-client-core",
- "defguard-client-proto",
- "defguard-client-service-locations",
- "futures-util",
- "http",
- "log",
- "reqwest 0.13.5",
- "semver",
- "serde",
- "serde_json",
- "sqlx",
- "tonic",
-]
-
-[[package]]
-name = "defguard-client-core"
-version = "2.2.0"
-dependencies = [
- "base64 0.23.1",
- "block2",
- "chrono",
- "defguard-client-common",
- "defguard-client-proto",
- "defguard_wireguard_rs",
- "dirs-next",
- "futures-util",
- "hex",
- "hyper-util",
- "log",
- "nix",
- "objc2",
- "objc2-app-kit",
- "objc2-foundation",
- "objc2-network-extension",
- "os_info",
- "prost",
- "reqwest 0.13.5",
- "rust-ini",
- "semver",
- "serde",
- "serde_json",
- "serde_with",
- "sqlx",
- "struct-patch",
- "strum",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tokio-tungstenite",
- "tokio-util",
- "tonic",
- "tower",
- "windows-sys 0.61.2",
- "wiremock",
- "x25519-dalek",
-]
-
-[[package]]
-name = "defguard-client-fido2"
-version = "2.2.0"
-dependencies = [
- "base64 0.23.1",
- "ciborium",
- "ctap-hid-fido2",
- "dispatch2",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "tokio",
- "tokio-util",
- "tracing",
- "url",
- "windows",
-]
-
-[[package]]
-name = "defguard-client-posture"
-version = "2.2.0"
-dependencies = [
- "defguard-client-core",
- "defguard-client-proto",
- "log",
- "reqwest 0.13.5",
- "serde",
- "serde_json",
- "sysinfo",
- "time",
- "tokio",
- "tonic",
- "wiremock",
- "wmi",
-]
-
-[[package]]
-name = "defguard-client-proto"
-version = "2.2.0"
-dependencies = [
- "defguard_wireguard_rs",
- "prost",
- "serde",
- "serde_with",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
- "tracing",
- "wmi",
- "x25519-dalek",
-]
-
-[[package]]
-name = "defguard-client-provisioning"
-version = "2.2.0"
-dependencies = [
- "log",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "defguard-client-service"
-version = "2.2.0"
-dependencies = [
- "anyhow",
- "async-stream",
- "clap",
- "defguard-client-common",
- "defguard-client-posture",
- "defguard-client-proto",
- "defguard-client-service-locations",
- "defguard_wireguard_rs",
- "futures-core",
- "nix",
- "thiserror 2.0.21",
- "tokio",
- "tokio-stream",
- "tonic",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "windows-core 0.100.0",
- "windows-service",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "defguard-client-service-locations"
-version = "2.2.0"
-dependencies = [
- "base64 0.23.1",
- "defguard-client-common",
- "defguard-client-core",
- "defguard-client-posture",
- "defguard-client-proto",
- "defguard_wireguard_rs",
- "futures-util",
- "known-folders",
- "log",
- "prost",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "uuid",
- "windows",
- "windows-acl",
- "windows-service",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "defguard-dg"
-version = "2.2.0"
-dependencies = [
- "clap",
- "defguard-client-common",
- "defguard-client-proto",
- "defguard_wireguard_rs",
- "dirs-next",
- "prost",
- "reqwest 0.13.5",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "tokio",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "defguard_boringtun"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fa2a70b14430feb68aa2ffe2be259650c0eb1c182ee49c9c7edeae3a0a07cc6"
-dependencies = [
- "aead",
- "base64 0.23.1",
- "blake2",
- "chacha20poly1305",
- "hex",
- "hmac",
- "ip_network",
- "ip_network_table",
- "libc",
- "nix",
- "parking_lot 0.13.0",
- "rand 0.10.3",
- "ring",
- "socket2",
- "thiserror 2.0.21",
- "tracing",
- "x25519-dalek",
-]
-
-[[package]]
-name = "defguard_wireguard_rs"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "580f28ecca39b5541747b6e98723d4e049698cbce6273d1dc589353189025d7d"
-dependencies = [
- "base64 0.23.1",
- "defguard_boringtun",
- "ipnet",
- "libc",
- "log",
- "netlink-packet-core",
- "netlink-packet-generic",
- "netlink-packet-route",
- "netlink-packet-utils",
- "netlink-packet-wireguard",
- "netlink-sys",
- "serde",
- "thiserror 2.0.21",
- "windows",
- "wireguard-nt",
- "x25519-dalek",
-]
-
-[[package]]
 name = "defmt"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9227,6 +8871,360 @@ dependencies = [
  "rusticata-macros",
  "thiserror 2.0.21",
  "time",
+]
+
+[[package]]
+name = "xguard-cli"
+version = "2.2.0"
+dependencies = [
+ "base64 0.23.1",
+ "chrono",
+ "clap",
+ "image",
+ "owo-colors",
+ "qrcode",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tonic",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "webbrowser",
+ "xguard-client-common",
+ "xguard-client-config-sync",
+ "xguard-client-core",
+ "xguard-client-posture",
+ "xguard-client-proto",
+]
+
+[[package]]
+name = "xguard-client"
+version = "2.2.0"
+dependencies = [
+ "async-stream",
+ "auto-launch",
+ "base64 0.23.1",
+ "block2",
+ "chrono",
+ "dispatch2",
+ "futures-core",
+ "known-folders",
+ "log",
+ "nix",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "objc2-network-extension",
+ "objc2-system-extensions",
+ "prost",
+ "regex",
+ "reqwest 0.13.5",
+ "rust-ini",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sqlx",
+ "struct-patch",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-clipboard-manager",
+ "tauri-plugin-deep-link",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-http",
+ "tauri-plugin-log",
+ "tauri-plugin-notification",
+ "tauri-plugin-opener",
+ "tauri-plugin-os",
+ "tauri-plugin-process",
+ "tauri-plugin-single-instance",
+ "tempfile",
+ "thiserror 2.0.21",
+ "time",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tonic",
+ "tonic-prost",
+ "tracing",
+ "uuid",
+ "vergen-git2",
+ "webbrowser",
+ "windows",
+ "windows-acl",
+ "windows-service",
+ "windows-sys 0.61.2",
+ "wiremock",
+ "wmi",
+ "xguard-cli",
+ "xguard-client-common",
+ "xguard-client-config-sync",
+ "xguard-client-core",
+ "xguard-client-fido2",
+ "xguard-client-posture",
+ "xguard-client-proto",
+ "xguard-client-provisioning",
+ "xguard_wireguard_rs",
+]
+
+[[package]]
+name = "xguard-client-common"
+version = "2.2.0"
+dependencies = [
+ "nix",
+ "vergen-git2",
+]
+
+[[package]]
+name = "xguard-client-config-sync"
+version = "2.2.0"
+dependencies = [
+ "futures-util",
+ "http",
+ "log",
+ "reqwest 0.13.5",
+ "semver",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tonic",
+ "xguard-client-core",
+ "xguard-client-proto",
+ "xguard-client-service-locations",
+]
+
+[[package]]
+name = "xguard-client-core"
+version = "2.2.0"
+dependencies = [
+ "base64 0.23.1",
+ "block2",
+ "chrono",
+ "dirs-next",
+ "futures-util",
+ "hex",
+ "hyper-util",
+ "log",
+ "nix",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "objc2-network-extension",
+ "os_info",
+ "prost",
+ "reqwest 0.13.5",
+ "rust-ini",
+ "semver",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sqlx",
+ "struct-patch",
+ "strum",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util",
+ "tonic",
+ "tower",
+ "windows-sys 0.61.2",
+ "wiremock",
+ "x25519-dalek",
+ "xguard-client-common",
+ "xguard-client-proto",
+ "xguard_wireguard_rs",
+]
+
+[[package]]
+name = "xguard-client-fido2"
+version = "2.2.0"
+dependencies = [
+ "base64 0.23.1",
+ "ciborium",
+ "ctap-hid-fido2",
+ "dispatch2",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "url",
+ "windows",
+]
+
+[[package]]
+name = "xguard-client-posture"
+version = "2.2.0"
+dependencies = [
+ "log",
+ "reqwest 0.13.5",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "time",
+ "tokio",
+ "tonic",
+ "wiremock",
+ "wmi",
+ "xguard-client-core",
+ "xguard-client-proto",
+]
+
+[[package]]
+name = "xguard-client-proto"
+version = "2.2.0"
+dependencies = [
+ "prost",
+ "serde",
+ "serde_with",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "wmi",
+ "x25519-dalek",
+ "xguard_wireguard_rs",
+]
+
+[[package]]
+name = "xguard-client-provisioning"
+version = "2.2.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "xguard-client-service"
+version = "2.2.0"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "clap",
+ "futures-core",
+ "nix",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "windows-core 0.100.0",
+ "windows-service",
+ "windows-sys 0.61.2",
+ "xguard-client-common",
+ "xguard-client-posture",
+ "xguard-client-proto",
+ "xguard-client-service-locations",
+ "xguard_wireguard_rs",
+]
+
+[[package]]
+name = "xguard-client-service-locations"
+version = "2.2.0"
+dependencies = [
+ "base64 0.23.1",
+ "futures-util",
+ "known-folders",
+ "log",
+ "prost",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+ "windows",
+ "windows-acl",
+ "windows-service",
+ "windows-sys 0.61.2",
+ "xguard-client-common",
+ "xguard-client-core",
+ "xguard-client-posture",
+ "xguard-client-proto",
+ "xguard_wireguard_rs",
+]
+
+[[package]]
+name = "xguard-dg"
+version = "2.2.0"
+dependencies = [
+ "clap",
+ "dirs-next",
+ "prost",
+ "reqwest 0.13.5",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "tracing-subscriber",
+ "xguard-client-common",
+ "xguard-client-proto",
+ "xguard_wireguard_rs",
+]
+
+[[package]]
+name = "xguard_boringtun"
+version = "0.7.1"
+source = "git+https://github.com/Sajjad-alaa/xguard-boringtun.git?rev=c210cfac205f016b51071be31110066416f61949#c210cfac205f016b51071be31110066416f61949"
+dependencies = [
+ "aead",
+ "base64 0.23.1",
+ "blake2",
+ "chacha20poly1305",
+ "hex",
+ "hmac",
+ "ip_network",
+ "ip_network_table",
+ "libc",
+ "nix",
+ "parking_lot 0.13.0",
+ "rand 0.10.3",
+ "ring",
+ "socket2",
+ "thiserror 2.0.21",
+ "tracing",
+ "x25519-dalek",
+]
+
+[[package]]
+name = "xguard_wireguard_rs"
+version = "0.12.4"
+source = "git+https://github.com/Sajjad-alaa/xguard-wireguard-rs.git?rev=2b201e5272bc214c05bb912c72ec241a580e04eb#2b201e5272bc214c05bb912c72ec241a580e04eb"
+dependencies = [
+ "base64 0.23.1",
+ "ipnet",
+ "libc",
+ "log",
+ "netlink-packet-core",
+ "netlink-packet-generic",
+ "netlink-packet-route",
+ "netlink-packet-utils",
+ "netlink-packet-wireguard",
+ "netlink-sys",
+ "serde",
+ "thiserror 2.0.21",
+ "windows",
+ "wireguard-nt",
+ "x25519-dalek",
+ "xguard_boringtun",
 ]
 
 [[package]]

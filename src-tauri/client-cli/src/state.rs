@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use defguard_core::{
+use xguard_core::{
     app_config::AppConfig,
     database::{handle_db_migrations, DbPool, DB_POOL},
     error::Error as CoreError,
@@ -67,7 +67,7 @@ impl State {
     /// Initialize the CLI runtime state: resolve data directory, open the
     /// shared SQLite pool, and run migrations.
     pub async fn init() -> Result<State, CliError> {
-        let data_dir = defguard_core::app_data_dir()
+        let data_dir = xguard_core::app_data_dir()
             .map(|p| p.to_string_lossy().to_string())
             .ok_or_else(|| {
                 CliError::Other(

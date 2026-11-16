@@ -1,6 +1,6 @@
 use std::net::AddrParseError;
 
-use defguard_wireguard_rs::{error::WireguardInterfaceError, net::IpAddrParseError};
+use xguard_wireguard_rs::{error::WireguardInterfaceError, net::IpAddrParseError};
 
 use crate::connection::ConflictingConnection;
 

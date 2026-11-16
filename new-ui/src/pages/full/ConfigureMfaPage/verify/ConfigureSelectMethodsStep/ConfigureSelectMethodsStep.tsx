@@ -127,7 +127,7 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
       let hint: string | null = null;
       let badge: string | undefined;
       if (!available || locked) {
-        hint = `${methodName} is not available on this Defguard instance.`;
+        hint = `${methodName} is not available on this XGuard instance.`;
         badge = 'Unavailable';
       } else if (disabled && !configured) {
         if (satisfied) {
@@ -135,7 +135,7 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
           hint = `${methodName} is required to continue.`;
           badge = 'Required';
         } else if (isClientConfigurableMethod(method)) {
-          hint = `This Defguard instance does not support configuring ${methodName} from the desktop client.`;
+          hint = `This XGuard instance does not support configuring ${methodName} from the desktop client.`;
           badge = 'Not configurable';
         } else {
           hint = `${methodName} cannot be configured in the desktop client.`;

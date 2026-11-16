@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, time::Duration};
 
-use defguard_client_core::connection::{
+use xguard_client_core::connection::{
     active_connections::find_connection,
     apple::{manager_for_key_and_value, LOCATION_ID, TUNNEL_ID, VPN_STATE_UPDATE_COMMS},
 };

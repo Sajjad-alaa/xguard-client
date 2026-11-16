@@ -22,8 +22,8 @@ use windows_sys::Win32::{
     System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES},
 };
 
-// Named-pipe name used for IPC between defguard client and windows service.
-pub(super) static PIPE_NAME: &str = r"\\.\pipe\defguard_daemon";
+// Named-pipe name used for IPC between xguard client and windows service.
+pub(super) static PIPE_NAME: &str = r"\\.\pipe\xguard_daemon";
 
 /// SDDL defining named pipe ACL:
 /// - `SY` (LocalSystem) - full control

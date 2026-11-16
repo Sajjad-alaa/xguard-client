@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, path::Path};
 
-use defguard_client_core::events::EventKey;
+use xguard_client_core::events::EventKey;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sqlx::SqlitePool;
@@ -261,7 +261,7 @@ mod tests {
             openid_display_name: None,
             openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
-            mfa_contract: defguard_client_core::mfa_contract::MfaContract::Legacy,
+            mfa_contract: xguard_client_core::mfa_contract::MfaContract::Legacy,
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,

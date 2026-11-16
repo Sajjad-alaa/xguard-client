@@ -9,13 +9,13 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Build a `--version` output string for a given binary name.
 ///
-/// Uses the `DEFGUARD_CLIENT_BUILD_VERSION` environment variable when set (CI pre-release
+/// Uses the `XGUARD_CLIENT_BUILD_VERSION` environment variable when set (CI pre-release
 /// builds), falling back to `CARGO_PKG_VERSION` + short commit hash.
 #[must_use]
 pub fn version_string(binary_name: &str) -> String {
     let sha = option_env!("VERGEN_GIT_SHA")
         .filter(|s| *s != "VERGEN_IDEMPOTENT_OUTPUT" && !s.trim().is_empty());
-    let version = option_env!("DEFGUARD_CLIENT_BUILD_VERSION")
+    let version = option_env!("XGUARD_CLIENT_BUILD_VERSION")
         .filter(|v| !v.trim().is_empty())
         .map_or_else(
             || match sha {

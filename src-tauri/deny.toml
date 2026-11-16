@@ -145,40 +145,40 @@ confidence-threshold = 0.8
 exceptions = [
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-cli" },
+    ], crate = "xguard-cli" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-client-common" },
+    ], crate = "xguard-client-common" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-client" },
+    ], crate = "xguard-client" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-client-core" },
+    ], crate = "xguard-client-core" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-client-service" },
+    ], crate = "xguard-client-service" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-client-proto" },
+    ], crate = "xguard-client-proto" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-dg" },
+    ], crate = "xguard-dg" },
     { allow = [
         "LicenseRef-Proprietary",
-    ], crate = "defguard-client-posture" },
+    ], crate = "xguard-client-posture" },
     { allow = [
         "LicenseRef-Proprietary",
-    ], crate = "defguard-client-provisioning" },
+    ], crate = "xguard-client-provisioning" },
     { allow = [
         "LicenseRef-Proprietary",
-    ], crate = "defguard-client-config-sync" },
+    ], crate = "xguard-client-config-sync" },
     { allow = [
         "LicenseRef-Proprietary",
-    ], crate = "defguard-client-service-locations" },
+    ], crate = "xguard-client-service-locations" },
     { allow = [
         "LicenseRef-Proprietary",
-    ], crate = "defguard-client-fido2" },
+    ], crate = "xguard-client-fido2" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,

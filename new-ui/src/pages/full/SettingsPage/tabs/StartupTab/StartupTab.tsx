@@ -34,7 +34,7 @@ export const StartupTab = ({ appConfig }: Props) => {
   return (
     <>
       <Toggle
-        label="Start Defguard automatically when your operating system starts"
+        label="Start XGuard automatically when your operating system starts"
         active={autostartEnabled ?? false}
         disabled={
           isAutostartStatusPending || isAutostartStatusError || isAutostartUpdating
@@ -50,7 +50,7 @@ export const StartupTab = ({ appConfig }: Props) => {
       <Divider spacing={ThemeSpacing.Xl} />
       <Toggle
         label="Open app in full window"
-        helper="Defguard always opens in the full window instead of the compact tray view, at startup and when opened from the system tray."
+        helper="XGuard always opens in the full window instead of the compact tray view, at startup and when opened from the system tray."
         active={appConfig.open_in_full_window}
         onClick={() =>
           patchConfig({ open_in_full_window: !appConfig.open_in_full_window })

@@ -1,4 +1,4 @@
-use defguard_client_proto::defguard::client_types::{
+use xguard_client_proto::xguard::client_types::{
     mfa_flow_start_response, mfa_flow_step_finish_request, mfa_step_result, mfa_step_started,
     ClientMfaFinishRequest, MfaAdvanced, MfaAwaitingExternal, MfaCompleted, MfaFido2Assertion,
     MfaFido2Challenge, MfaFlowStartAccepted, MfaFlowStartRejected, MfaFlowStartResponse,
@@ -559,7 +559,7 @@ async fn test_mfa_finish_multi_step_sends_typed_code() {
         token: "flow-token".into(),
         step_attempt_id: "attempt-1".into(),
         submission: Some(mfa_flow_step_finish_request::Submission::Code(
-            defguard_client_proto::defguard::client_types::MfaCodeCredential {
+            xguard_client_proto::xguard::client_types::MfaCodeCredential {
                 code: "123456".into(),
             },
         )),
@@ -1302,9 +1302,9 @@ fn test_derive_ws_url_https_to_wss() {
 
 #[test]
 fn test_derive_ws_url_preserves_path_prefix() {
-    let base = Url::parse("https://proxy.example.com/defguard/").unwrap();
+    let base = Url::parse("https://proxy.example.com/xguard/").unwrap();
     let ws = derive_ws_url(&base, "tok").unwrap();
-    assert!(ws.starts_with("wss://proxy.example.com/defguard/api/v1/client-mfa/remote"));
+    assert!(ws.starts_with("wss://proxy.example.com/xguard/api/v1/client-mfa/remote"));
 }
 
 #[test]

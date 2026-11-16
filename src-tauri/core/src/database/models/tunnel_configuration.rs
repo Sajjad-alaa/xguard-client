@@ -9,8 +9,8 @@ use std::{
 };
 
 use block2::RcBlock;
-use defguard_client_common::dns_owned;
-use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer};
+use xguard_client_common::dns_owned;
+use xguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer};
 use objc2::{rc::Retained, runtime::AnyObject};
 use objc2_foundation::{
     ns_string, NSDictionary, NSError, NSMutableArray, NSMutableDictionary, NSNumber, NSString,

@@ -1,4 +1,4 @@
-use defguard_core::database::models::location::{
+use xguard_core::database::models::location::{
     LocationMfaMode, LocationMfaStepMethod, ServiceLocationMode,
 };
 use sqlx::types::Json;

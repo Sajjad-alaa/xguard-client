@@ -3,11 +3,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use defguard_client_core::{
+use xguard_client_core::{
     connection::active_connections::ACTIVE_CONNECTIONS, enrollment::EnrollmentSession,
     mfa::MfaAuthSession, mfa_config::MfaConfigSession,
 };
-use defguard_client_provisioning::ProvisioningConfig;
+use xguard_client_provisioning::ProvisioningConfig;
 use tauri::{
     async_runtime::{spawn, JoinHandle},
     PhysicalPosition,

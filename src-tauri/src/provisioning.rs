@@ -1,5 +1,5 @@
-use defguard_client_core::database::{models::instance::Instance, DB_POOL};
-use defguard_client_provisioning::{try_get_provisioning_config, ProvisioningConfig};
+use xguard_client_core::database::{models::instance::Instance, DB_POOL};
+use xguard_client_provisioning::{try_get_provisioning_config, ProvisioningConfig};
 use tauri::{AppHandle, Manager};
 
 /// Checks if the client has already been initialized

@@ -1,4 +1,4 @@
-use defguard_core::database::{
+use xguard_core::database::{
     models::{instance::Instance, location::Location, tunnel::Tunnel, Id},
     DbPool,
 };
@@ -29,7 +29,7 @@ pub async fn resolve_connect_target(
     if let ResolvedTarget::Location(location) = &target {
         if location.is_service_location() {
             return Err(CliError::InvalidInput(format!(
-                "'{}' is a service location and is managed by the defguard service",
+                "'{}' is a service location and is managed by the xguard service",
                 location.name
             )));
         }
@@ -164,7 +164,7 @@ async fn resolve_sole_location(pool: &DbPool) -> Result<ResolvedTarget, CliError
 
 #[cfg(test)]
 mod tests {
-    use defguard_core::{
+    use xguard_core::{
         database::models::{
             instance::{ClientTrafficPolicy, Instance, OpenIdProviderKind},
             location::{Location, LocationMfaMode, ServiceLocationMode},

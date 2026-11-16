@@ -1,7 +1,7 @@
 use std::{env, sync::LazyLock, time::Duration};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
-use defguard_client_proto::defguard::client_types::ClientPlatformInfo;
+use xguard_client_proto::xguard::client_types::ClientPlatformInfo;
 use prost::Message;
 use reqwest::{Client, Response, Url};
 use serde::Serialize;

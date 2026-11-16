@@ -12,7 +12,7 @@ use std::sync::{
 #[cfg(not(target_os = "macos"))]
 use base64::Engine as _;
 #[cfg(not(target_os = "macos"))]
-use defguard_client_proto::defguard::client::v1::{InterfaceData, Peer};
+use xguard_client_proto::xguard::client::v1::{InterfaceData, Peer};
 #[cfg(target_os = "macos")]
 use objc2_network_extension::NEVPNStatus;
 #[cfg(not(target_os = "macos"))]

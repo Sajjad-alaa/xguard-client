@@ -28,7 +28,7 @@ const COPYRIGHT: &str = "Copyright (C) 2026 Defguard Sp. z o.o.";
 
 /// Print logo + copyright + project name/version to stdout. Picks the
 /// colored logo variant on an interactive TTY and the mono fallback
-/// otherwise (so `defguard-client --help | cat` stays clean ASCII).
+/// otherwise (so `xguard-client --help | cat` stays clean ASCII).
 #[cfg(not(windows))]
 pub fn print_banner() {
     // owo-colors' supports-colors detection drives the choice: if
@@ -45,7 +45,7 @@ pub fn print_banner() {
     let logo = if use_color { LOGO_COLOR } else { LOGO_MONO };
     println!("{logo}");
 
-    let project = common::version_string("defguard-client");
+    let project = common::version_string("xguard-client");
     if use_color {
         println!("    {}", project.bright_yellow().bold());
         println!("    {}", COPYRIGHT.dimmed());
@@ -61,7 +61,7 @@ pub fn print_banner() {
 /// console fonts can't render, and the console may not interpret ANSI.
 #[cfg(windows)]
 pub fn print_banner() {
-    let project = common::version_string("defguard-client");
+    let project = common::version_string("xguard-client");
     println!();
     println!("    {project}");
     println!("    {COPYRIGHT}");

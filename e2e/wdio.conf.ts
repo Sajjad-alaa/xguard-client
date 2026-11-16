@@ -22,7 +22,7 @@ if (fs.existsSync(envFile)) {
 
 const clientBinary =
 	process.env.CLIENT_BINARY ??
-	path.resolve(here, "../src-tauri/target/release/defguard-client");
+	path.resolve(here, "../src-tauri/target/release/xguard-client");
 const tauriDriverBinary =
 	process.env.TAURI_DRIVER ??
 	path.join(os.homedir(), ".cargo", "bin", "tauri-driver");
@@ -96,11 +96,11 @@ export const config: WebdriverIO.Config = {
 	beforeSession: (_config, caps, specs) => {
 		killLeftoverClients();
 		cleanupWireguardInterfaces();
-		dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "defguard-e2e-"));
+		dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "xguard-e2e-"));
 		const launchConfig = getLaunchConfig(specs);
 		const sessionEnv = {
 			CLIENT_BINARY: clientBinary,
-			DEFGUARD_CLIENT_WELCOME_SKIP: "1",
+			XGUARD_CLIENT_WELCOME_SKIP: "1",
 			E2E_DATA_DIR: dataDir,
 			XDG_DATA_HOME: path.join(dataDir, "share"),
 			XDG_CONFIG_HOME: path.join(dataDir, "config"),

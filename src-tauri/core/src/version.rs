@@ -13,15 +13,15 @@ use crate::set_perms;
 
 pub const MIN_CORE_VERSION: Version = Version::new(1, 6, 0);
 pub const MIN_PROXY_VERSION: Version = Version::new(1, 6, 0);
-pub const CORE_VERSION_HEADER: &str = "defguard-core-version";
-pub const PROXY_VERSION_HEADER: &str = "defguard-component-version";
-pub const CLIENT_VERSION_HEADER: &str = "defguard-client-version";
-pub const CLIENT_PLATFORM_HEADER: &str = "defguard-client-platform";
-pub const LOG_FILENAME: &str = "defguard-client";
-pub const WELCOME_FORCE_ENV_VAR: &str = "DEFGUARD_CLIENT_WELCOME_FORCE";
-pub const WELCOME_SKIP_ENV_VAR: &str = "DEFGUARD_CLIENT_WELCOME_SKIP";
+pub const CORE_VERSION_HEADER: &str = "xguard-core-version";
+pub const PROXY_VERSION_HEADER: &str = "xguard-component-version";
+pub const CLIENT_VERSION_HEADER: &str = "xguard-client-version";
+pub const CLIENT_PLATFORM_HEADER: &str = "xguard-client-platform";
+pub const LOG_FILENAME: &str = "xguard-client";
+pub const WELCOME_FORCE_ENV_VAR: &str = "XGUARD_CLIENT_WELCOME_FORCE";
+pub const WELCOME_SKIP_ENV_VAR: &str = "XGUARD_CLIENT_WELCOME_SKIP";
 pub const WELCOME_CONTENT_VERSION: Version = Version::new(2, 2, 0);
-pub use defguard_client_common::VERSION as PKG_VERSION;
+pub use xguard_client_common::VERSION as PKG_VERSION;
 
 /// Selects the version string the client should report: the build-version override when present
 /// and non-blank, otherwise the package version.

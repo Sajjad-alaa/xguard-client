@@ -4,14 +4,14 @@ use std::{
     time::Duration,
 };
 
-pub use defguard_client_config_sync::commands::{
+pub use xguard_client_config_sync::commands::{
     disable_enterprise_features, do_update_instance, locations_changed, sync_service_locations,
     sync_service_locations_best_effort,
 };
-use defguard_client_config_sync::{
+use xguard_client_config_sync::{
     poll_instance, poll_instances, PollInstanceResult, VersionMismatchPayload,
 };
-use defguard_client_core::{
+use xguard_client_core::{
     connection::active_connections::{active_connections, ACTIVE_CONNECTIONS},
     database::{
         models::{instance::Instance, location::Location, Id},

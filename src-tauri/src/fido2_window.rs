@@ -1,7 +1,7 @@
 //! Attaching a security key prompt to the window that asked for it. An unowned dialog opens
 //! behind the application, leaving the user on an apparently frozen panel.
 
-use defguard_client_fido2::PlatformContext;
+use xguard_client_fido2::PlatformContext;
 use tauri::WebviewWindow;
 
 /// Always the window the command was invoked from, since FIDO2 is reachable from both the tray

@@ -2,11 +2,11 @@ use std::process::Command;
 /// Connection setup helpers.
 use std::str::FromStr;
 
-use defguard_client_common::{find_free_tcp_port, get_interface_name};
-use defguard_client_proto::defguard::client::v1::CreateInterfaceRequest;
+use xguard_client_common::{find_free_tcp_port, get_interface_name};
+use xguard_client_proto::xguard::client::v1::CreateInterfaceRequest;
 #[cfg(not(target_os = "macos"))]
-use defguard_client_proto::defguard::client::v1::RemoveInterfaceRequest;
-use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
+use xguard_client_proto::xguard::client::v1::RemoveInterfaceRequest;
+use xguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 #[cfg(not(target_os = "macos"))]
 use tonic::Code;
 

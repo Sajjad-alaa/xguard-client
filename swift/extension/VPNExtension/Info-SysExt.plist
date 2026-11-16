@@ -5,7 +5,7 @@
 	<key>NetworkExtension</key>
 	<dict>
 		<key>NEMachServiceName</key>
-		<string>group.net.defguard</string>
+		<string>group.local.xguard</string>
 		<key>NEProviderClasses</key>
 		<dict>
 			<key>com.apple.networkextension.packet-tunnel</key>
@@ -13,6 +13,6 @@
 		</dict>
 	</dict>
 	<key>NSSystemExtensionUsageDescription</key>
-	<string>Defguard uses a system extension to establish and manage secure VPN connections.</string>
+	<string>XGuard uses a system extension to establish and manage secure VPN connections.</string>
 </dict>
 </plist>

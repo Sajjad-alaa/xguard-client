@@ -30,7 +30,7 @@ describe('mfaErrorToCard', () => {
     [
       'outdated mobile app',
       mfaError('mobile_client_outdated'),
-      'Your Defguard mobile app is out of date.\nUpgrade to approve this connection.',
+      'Your XGuard mobile app is out of date.\nUpgrade to approve this connection.',
       IconKind.DisableMfa,
       null,
     ],

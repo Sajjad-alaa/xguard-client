@@ -1,6 +1,6 @@
 [package]
-name = "defguard-client-service"
-description = "Defguard client daemon service"
+name = "xguard-client-service"
+description = "XGuard client daemon service"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -11,11 +11,11 @@ version.workspace = true
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
-defguard-client-common = { path = "../common" }
-defguard-client-proto = { path = "../client-proto" }
-defguard-client-posture = { path = "../enterprise/posture" }
-defguard-client-service-locations = { path = "../enterprise/service-locations" }
-defguard_wireguard_rs.workspace = true
+xguard-client-common = { path = "../common" }
+xguard-client-proto = { path = "../client-proto" }
+xguard-client-posture = { path = "../enterprise/posture" }
+xguard-client-service-locations = { path = "../enterprise/service-locations" }
+xguard_wireguard_rs.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
@@ -35,5 +35,5 @@ windows-service.workspace = true
 windows-sys.workspace = true
 
 [[bin]]
-name = "defguard-service"
-path = "src/bin/defguard-service.rs"
+name = "xguard-service"
+path = "src/bin/xguard-service.rs"

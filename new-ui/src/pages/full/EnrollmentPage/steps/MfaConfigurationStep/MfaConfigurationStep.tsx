@@ -123,7 +123,7 @@ export const TotpSetup = () => {
   const secret = useEnrollmentStore((s) => s.userTotpSecret);
 
   const qrData = useMemo(() => {
-    return `otpauth://totp/Defguard?secret=${secret}`;
+    return `otpauth://totp/XGuard?secret=${secret}`;
   }, [secret]);
 
   return (

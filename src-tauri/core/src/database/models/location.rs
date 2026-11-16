@@ -2,9 +2,9 @@ use std::fmt;
 #[cfg(not(target_os = "macos"))]
 use std::str::FromStr;
 
-use defguard_wireguard_rs::net::IpAddrMask;
+use xguard_wireguard_rs::net::IpAddrMask;
 #[cfg(not(target_os = "macos"))]
-use defguard_wireguard_rs::{key::Key, peer::Peer, InterfaceConfiguration};
+use xguard_wireguard_rs::{key::Key, peer::Peer, InterfaceConfiguration};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExecutor};
 
@@ -191,7 +191,7 @@ pub fn infer_mfa_method(
 pub struct Location<I = NoId> {
     pub id: I,
     pub instance_id: Id,
-    // Native ID of network from Defguard
+    // Native ID of network from XGuard
     pub network_id: Id,
     pub name: String,
     pub address: String,
@@ -210,7 +210,7 @@ pub struct Location<I = NoId> {
     pub mfa_steps: Json<Vec<LocationMfaStep>>,
     #[serde(default)]
     pub mfa_step_plan: Json<Vec<LocationMfaMethod>>,
-    /// MTU suggested by Defguard Core for this location. Used only when MTU not set in the
+    /// MTU suggested by XGuard Core for this location. Used only when MTU not set in the
     /// application settings.
     #[serde(default)]
     pub client_mtu: Option<u32>,

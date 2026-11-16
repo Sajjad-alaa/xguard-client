@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 
 #[cfg(not(target_os = "macos"))]
-use defguard_client_core::{
+use xguard_client_core::{
     connection::daemon_client::DAEMON_CLIENT, database::models::wireguard_keys::WireguardKeys,
 };
-use defguard_client_core::{
+use xguard_client_core::{
     database::{
         models::{
             instance::{ClientTrafficPolicy, Instance},
@@ -17,11 +17,11 @@ use defguard_client_core::{
     into_location,
 };
 #[cfg(not(target_os = "macos"))]
-use defguard_client_proto::defguard::client::v1::{
+use xguard_client_proto::xguard::client::v1::{
     DeleteServiceLocationsRequest, SaveServiceLocationsRequest,
 };
-use defguard_client_proto::defguard::client_types::DeviceConfigResponse;
-use defguard_client_service_locations::to_service_location;
+use xguard_client_proto::xguard::client_types::DeviceConfigResponse;
+use xguard_client_service_locations::to_service_location;
 use sqlx::{Sqlite, SqliteExecutor, Transaction};
 
 pub async fn locations_changed(

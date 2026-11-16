@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use chrono::{NaiveDateTime, TimeDelta, Utc};
-use defguard_client_core::connection::active_connections::ACTIVE_CONNECTIONS;
+use xguard_client_core::connection::active_connections::ACTIVE_CONNECTIONS;
 use tauri::{AppHandle, Manager};
 use tokio::time::interval;
 

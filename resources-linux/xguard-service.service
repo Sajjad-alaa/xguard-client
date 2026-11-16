@@ -1,13 +1,13 @@
 [Unit]
-Description=Defguard interface daemon service
-Documentation=https://docs.defguard.net
+Description=XGuard interface daemon service
+Documentation=https://docs.xguard.local
 Wants=network-online.target
 After=network-online.target
 
 [Service]
-Group=defguard
+Group=xguard
 ExecReload=/bin/kill -HUP $MAINPID
-ExecStart=/usr/sbin/defguard-service
+ExecStart=/usr/sbin/xguard-service
 KillMode=process
 KillSignal=SIGINT
 LimitNOFILE=65536

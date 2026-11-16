@@ -5,7 +5,7 @@ use std::{cmp::Ordering, collections::HashSet, str::FromStr};
 
 pub mod commands;
 
-use defguard_client_core::{
+use xguard_client_core::{
     database::{
         models::{
             instance::{mfa_contract_from_instance_info, Instance},
@@ -17,7 +17,7 @@ use defguard_client_core::{
     proxy::post_with_headers,
     version::{CORE_VERSION_HEADER, MIN_CORE_VERSION, MIN_PROXY_VERSION, PROXY_VERSION_HEADER},
 };
-use defguard_client_proto::defguard::client_types::{InstanceInfoRequest, InstanceInfoResponse};
+use xguard_client_proto::xguard::client_types::{InstanceInfoRequest, InstanceInfoResponse};
 use futures_util::future::join_all;
 use reqwest::{StatusCode, Url};
 use semver::Version;
@@ -30,7 +30,7 @@ use crate::commands::{
 
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
-const CORE_CONNECTED_HEADER: &str = "defguard-core-connected";
+const CORE_CONNECTED_HEADER: &str = "xguard-core-connected";
 
 /// Result of a successful config fetch from the proxy.
 #[derive(Debug)]
@@ -320,7 +320,7 @@ pub async fn poll_instances(
 pub async fn config_changed(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &Instance<Id>,
-    device_config: &defguard_client_proto::defguard::client_types::DeviceConfigResponse,
+    device_config: &xguard_client_proto::xguard::client_types::DeviceConfigResponse,
 ) -> Result<bool, Error> {
     debug!(
         "Checking if config and any of the locations changed for instance {}({})",
@@ -358,12 +358,12 @@ fn check_min_version(
     let detected_core_version: String;
     let detected_proxy_version: String;
 
-    let defguard_core_connected: Option<bool> = response
+    let xguard_core_connected: Option<bool> = response
         .headers()
         .get(CORE_CONNECTED_HEADER)
         .and_then(|v| {
             debug!(
-                "Defguard core connection status header for instance {}({}): {v:?}",
+                "XGuard core connection status header for instance {}({}): {v:?}",
                 instance.name, instance.id
             );
             v.to_str().ok()
@@ -435,24 +435,24 @@ fn check_min_version(
         false
     };
 
-    let should_inform = match defguard_core_connected {
+    let should_inform = match xguard_core_connected {
         Some(true) => {
             debug!(
-                "Defguard core is connected for instance {}({})",
+                "XGuard core is connected for instance {}({})",
                 instance.name, instance.id
             );
             true
         }
         Some(false) => {
             info!(
-                "Defguard core is not connected for instance {}({})",
+                "XGuard core is not connected for instance {}({})",
                 instance.name, instance.id
             );
             false
         }
         None => {
             debug!(
-                "Defguard core connection status unknown for instance {}({})",
+                "XGuard core connection status unknown for instance {}({})",
                 instance.name, instance.id
             );
             true

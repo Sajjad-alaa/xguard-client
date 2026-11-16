@@ -9,7 +9,7 @@ base64 = "0.23"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.6", features = ["cargo", "derive", "env"] }
 ctap-hid-fido2 = "3.6"
-defguard_wireguard_rs = "0.12"
+xguard_wireguard_rs = { git = "https://github.com/Sajjad-alaa/xguard-wireguard-rs.git", rev = "2b201e5272bc214c05bb912c72ec241a580e04eb", version = "0.12" }
 dirs-next = "2.0"
 futures-core = "0.3"
 futures-util = "0.3"
@@ -95,18 +95,18 @@ x25519-dalek = { version = "3.0", features = [
 ] }
 
 [workspace.package]
-authors = ["Defguard"]
+authors = ["XGuard"]
 edition = "2021"
-homepage = "https://github.com/DefGuard/client"
+homepage = "https://github.com/Sajjad-alaa/xguard-client"
 license-file = "../LICENSE.md"
 rust-version = "1.95"
 version = "2.2.0"
 
 [package]
-name = "defguard-client"
-description = "Defguard desktop client"
-repository = "https://github.com/DefGuard/client"
-default-run = "defguard-client"
+name = "xguard-client"
+description = "XGuard desktop client"
+repository = "https://github.com/Sajjad-alaa/xguard-client"
+default-run = "xguard-client"
 autobins = false
 authors.workspace = true
 edition.workspace = true
@@ -116,7 +116,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [[bin]]
-name = "defguard-client"
+name = "xguard-client"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -130,15 +130,15 @@ redundant_closure = "warn"
 [dependencies]
 base64.workspace = true
 chrono.workspace = true
-defguard-cli.path = "client-cli"
-defguard-client-fido2.path = "enterprise/fido2"
-defguard-client-proto.path = "client-proto"
-defguard-client-core.path = "core"
-defguard-client-posture.path = "enterprise/posture"
-defguard-client-config-sync.path = "enterprise/config-sync"
-defguard-client-provisioning.path = "enterprise/provisioning"
-defguard-client-common.path = "common"
-defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
+xguard-cli.path = "client-cli"
+xguard-client-fido2.path = "enterprise/fido2"
+xguard-client-proto.path = "client-proto"
+xguard-client-core.path = "core"
+xguard-client-posture.path = "enterprise/posture"
+xguard-client-config-sync.path = "enterprise/config-sync"
+xguard-client-provisioning.path = "enterprise/provisioning"
+xguard-client-common.path = "common"
+xguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 log.workspace = true
 prost.workspace = true
 regex.workspace = true

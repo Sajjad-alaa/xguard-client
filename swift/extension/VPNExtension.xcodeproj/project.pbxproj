@@ -37,10 +37,10 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		660FE5002EA779E8006A7447 /* Defguard */ = {
+		660FE5002EA779E8006A7447 /* XGuard */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			name = Defguard;
-			path = ../plugin/Sources/Defguard;
+			name = XGuard;
+			path = ../plugin/Sources/XGuard;
 			sourceTree = SOURCE_ROOT;
 		};
 		660FE50B2EA77C68006A7447 /* BoringTun */ = {
@@ -83,7 +83,7 @@
 			isa = PBXGroup;
 			children = (
 				660FE50B2EA77C68006A7447 /* BoringTun */,
-				660FE5002EA779E8006A7447 /* Defguard */,
+				660FE5002EA779E8006A7447 /* XGuard */,
 				66CABCD92EA76D070057D1AF /* VPNExtension */,
 				66CABCD62EA76D060057D1AF /* Frameworks */,
 				66CABCD52EA76D060057D1AF /* Products */,
@@ -123,7 +123,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				660FE5002EA779E8006A7447 /* Defguard */,
+				660FE5002EA779E8006A7447 /* XGuard */,
 				660FE50B2EA77C68006A7447 /* BoringTun */,
 				66CABCD92EA76D070057D1AF /* VPNExtension */,
 			);
@@ -147,7 +147,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				660FE5002EA779E8006A7447 /* Defguard */,
+				660FE5002EA779E8006A7447 /* XGuard */,
 				660FE50B2EA77C68006A7447 /* BoringTun */,
 				66CABCD92EA76D070057D1AF /* VPNExtension */,
 			);
@@ -311,7 +311,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = net.defguard.VPNExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = local.xguard.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
@@ -401,10 +401,10 @@
 				MARKETING_VERSION = 2.2.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = net.defguard.VPNExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = local.xguard.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Defguard VPNExtension App Store";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "XGuard VPNExtension App Store";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -450,7 +450,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/Installer.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application: xguard sp. z o.o. (82GZ7KN29J)";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = "@BUILD_NUMBER@";
@@ -493,10 +493,10 @@
 				MARKETING_VERSION = 2.2.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = net.defguard.VPNExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = local.xguard.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Defguard VPNExtension Mac DeveloperID";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "XGuard VPNExtension Mac DeveloperID";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -545,7 +545,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				ONLY_ACTIVE_ARCH = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/BoringTun/defguard_boringtunFFI.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/BoringTun/xguard_boringtunFFI.h";
 			};
 			name = Debug;
 		};
@@ -585,7 +585,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/BoringTun/defguard_boringtunFFI.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/BoringTun/xguard_boringtunFFI.h";
 			};
 			name = Release;
 		};
@@ -669,7 +669,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = net.defguard.VPNExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = local.xguard.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
@@ -758,10 +758,10 @@
 				MARKETING_VERSION = 2.2.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = net.defguard.VPNExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = local.xguard.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Defguard VPNExtension App Store";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "XGuard VPNExtension App Store";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -810,7 +810,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/BoringTun/defguard_boringtunFFI.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/BoringTun/xguard_boringtunFFI.h";
 			};
 			name = Installer;
 		};
@@ -846,7 +846,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application: defguard sp. z o.o. (82GZ7KN29J)";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application: xguard sp. z o.o. (82GZ7KN29J)";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = "@BUILD_NUMBER@";
@@ -889,10 +889,10 @@
 				MARKETING_VERSION = 2.2.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = net.defguard.VPNExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = local.xguard.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Defguard VPNExtension Mac DeveloperID";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "XGuard VPNExtension Mac DeveloperID";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;

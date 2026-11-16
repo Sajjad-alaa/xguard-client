@@ -1,4 +1,4 @@
-//! Defguard desktop client
+//! XGuard desktop client
 
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -14,20 +14,20 @@ use std::{
 };
 
 #[cfg(target_os = "macos")]
-use defguard_client::connection::apple::spawn_runloop_and_wait_for;
+use xguard_client::connection::apple::spawn_runloop_and_wait_for;
 #[cfg(target_os = "linux")]
-use defguard_client::utils::set_webkitgtk_variables;
-use defguard_client::{check_version_flag, gui::run_app};
+use xguard_client::utils::set_webkitgtk_variables;
+use xguard_client::{check_version_flag, gui::run_app};
 use tauri::async_runtime::block_on;
 
 fn main() {
     // Handle --version / -V before starting the client.
-    check_version_flag("defguard-client");
+    check_version_flag("xguard-client");
 
     // On Windows and Linux a deep-link launches a new process with the URL as its only
     // argument. That must start the GUI, not the CLI.
     let is_deep_link = if let Some(value) = env::args().nth(1) {
-        value.starts_with("defguard://")
+        value.starts_with("xguard://")
     } else {
         false
     };
@@ -44,13 +44,13 @@ fn main() {
             let done = Arc::new(AtomicBool::new(false));
             let done_clone = Arc::clone(&done);
             let worker = spawn(move || {
-                let _code = block_on(defguard_cli::cli_main());
+                let _code = block_on(xguard_cli::cli_main());
                 done_clone.store(true, Ordering::Release);
             });
             spawn_runloop_and_wait_for(&done);
             let _ = worker.join();
         }
         #[cfg(not(target_os = "macos"))]
-        block_on(defguard_cli::cli_main());
+        block_on(xguard_cli::cli_main());
     }
 }

@@ -1,6 +1,6 @@
 [package]
-name = "defguard-client-config-sync"
-description = "Real-time configuration sync for the Defguard desktop client"
+name = "xguard-client-config-sync"
+description = "Real-time configuration sync for the XGuard desktop client"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -9,9 +9,9 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-defguard-client-core = { path = "../../core" }
-defguard-client-proto = { path = "../../client-proto" }
-defguard-client-service-locations = { path = "../service-locations" }
+xguard-client-core = { path = "../../core" }
+xguard-client-proto = { path = "../../client-proto" }
+xguard-client-service-locations = { path = "../service-locations" }
 futures-util.workspace = true
 log.workspace = true
 reqwest.workspace = true

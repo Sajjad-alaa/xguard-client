@@ -1,4 +1,4 @@
-//! Enrollment flow for adding a new Defguard instance.
+//! Enrollment flow for adding a new XGuard instance.
 //!
 //! Handles the client-side enrollment protocol against the Edge proxy:
 //! starting enrollment, creating a device, activating the user, registering
@@ -6,7 +6,7 @@
 
 use std::time::Duration;
 
-use defguard_client_proto::defguard::client_types::{
+use xguard_client_proto::xguard::client_types::{
     CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
     EnrollmentStartResponse,
 };
@@ -100,12 +100,12 @@ async fn check_enrollment_response(response: Response) -> Result<Response, Enrol
     Ok(response)
 }
 
-/// Extract the `defguard_proxy` session cookie from a response's `Set-Cookie`
+/// Extract the `xguard_proxy` session cookie from a response's `Set-Cookie`
 /// headers.
-fn extract_defguard_cookie(response: &Response) -> Result<String, EnrollmentError> {
+fn extract_xguard_cookie(response: &Response) -> Result<String, EnrollmentError> {
     for value in response.headers().get_all(reqwest::header::SET_COOKIE) {
         let raw = value.to_str().unwrap_or_default();
-        if raw.starts_with("defguard_proxy=") {
+        if raw.starts_with("xguard_proxy=") {
             // Take everything up to the first `;`.
             return Ok(raw.split(';').next().unwrap_or(raw).to_string());
         }
@@ -116,7 +116,7 @@ fn extract_defguard_cookie(response: &Response) -> Result<String, EnrollmentErro
 /// Start the enrollment process.
 ///
 /// POSTs `{ "token": "<token>" }` to `/api/v1/enrollment/start`, extracts
-/// the `defguard_proxy` session cookie from the `Set-Cookie` response
+/// the `xguard_proxy` session cookie from the `Set-Cookie` response
 /// header, and returns the session together with the full enrollment
 /// start response (admin, user, settings, instance, deadline).
 pub async fn enrollment_start(
@@ -162,7 +162,7 @@ pub async fn enrollment_start(
         });
     }
 
-    let cookie = extract_defguard_cookie(&response)?;
+    let cookie = extract_xguard_cookie(&response)?;
 
     let body: EnrollmentStartResponse =
         response.json().await.map_err(|e| EnrollmentError::Other {
@@ -346,8 +346,8 @@ mod tests {
             "instance": {
                 "id": "inst-1",
                 "name": "Test Instance",
-                "url": "https://test.defguard.net",
-                "proxy_url": "https://proxy.defguard.net",
+                "url": "https://test.xguard.local",
+                "proxy_url": "https://proxy.xguard.local",
                 "username": "jdoe",
                 "enterprise_enabled": false,
                 "disable_all_traffic": false,
@@ -370,7 +370,7 @@ mod tests {
                     .set_body_json(&response_body)
                     .insert_header(
                         "Set-Cookie",
-                        "defguard_proxy=test-session-cookie; Path=/api/v1/enrollment",
+                        "xguard_proxy=test-session-cookie; Path=/api/v1/enrollment",
                     ),
             )
             .mount(&server)
@@ -383,7 +383,7 @@ mod tests {
         let settings = response.settings.expect("settings must be present");
         let instance = response.instance.expect("instance must be present");
 
-        assert_eq!(session.cookie, "defguard_proxy=test-session-cookie");
+        assert_eq!(session.cookie, "xguard_proxy=test-session-cookie");
         assert_eq!(user.first_name, "John");
         assert_eq!(user.login, "jdoe");
         assert_eq!(admin.name, "Admin");
@@ -477,7 +477,7 @@ mod tests {
 
     fn make_session(server: &MockServer) -> EnrollmentSession {
         EnrollmentSession {
-            cookie: "defguard_proxy=test-session-cookie".into(),
+            cookie: "xguard_proxy=test-session-cookie".into(),
             proxy_url: mock_url(server),
             client: Client::new(),
         }
@@ -506,8 +506,8 @@ mod tests {
             "instance": {
                 "id": "inst-1",
                 "name": "Test Instance",
-                "url": "https://test.defguard.net",
-                "proxy_url": "https://proxy.defguard.net",
+                "url": "https://test.xguard.local",
+                "proxy_url": "https://proxy.xguard.local",
                 "username": "jdoe",
                 "enterprise_enabled": false,
                 "disable_all_traffic": false,

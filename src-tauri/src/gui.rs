@@ -9,8 +9,8 @@ use std::{
 };
 
 #[cfg(target_os = "macos")]
-use defguard_client_core::connection::sync_locations_and_tunnels;
-use defguard_client_core::{
+use xguard_client_core::connection::sync_locations_and_tunnels;
+use xguard_client_core::{
     connection::active_connections::close_all_connections,
     version::{check_app_version, should_show_welcome, VersionCheckResult},
 };
@@ -161,7 +161,7 @@ async fn startup(app_handle: &AppHandle) {
 }
 
 pub fn run_app() {
-    info!("Starting Defguard client version {VERSION}");
+    info!("Starting XGuard client version {VERSION}");
 
     let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -256,7 +256,7 @@ pub fn run_app() {
         // Initialize plugins here, except for `tauri_plugin_log` which is handled in `setup()`.
         // Single instance plugin should always be the first to register.
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            let is_deep_link = argv.iter().any(|a| a.starts_with("defguard://"));
+            let is_deep_link = argv.iter().any(|a| a.starts_with("xguard://"));
             // User tried to spawn second instance, mirror tray left click path.
             if !is_deep_link {
                 show_tray_or_full_view(app);
@@ -280,8 +280,8 @@ pub fn run_app() {
 
                 const DOC_ITEM_ID: &str = "doc";
                 const REPORT_ITEM_ID: &str = "issue";
-                const DOC_URL: &str = "https://docs.defguard.net/using-defguard-for-end-users/desktop-client";
-                const REPORT_URL: &str = "https://github.com/DefGuard/client/issues/new?labels=bug&template=bug_report.md";
+                const DOC_URL: &str = "https://docs.xguard.local/using-xguard-for-end-users/desktop-client";
+                const REPORT_URL: &str = "https://github.com/Sajjad-alaa/xguard-client/issues/new?labels=bug&template=bug_report.md";
                 if let Some(menu) = app.menu() {
                     if let Some(help_submenu) = menu.get(tauri::menu::HELP_SUBMENU_ID) {
                         let report_item = tauri::menu::MenuItem::with_id(
@@ -295,7 +295,7 @@ pub fn run_app() {
                         let doc_item = tauri::menu::MenuItem::with_id(
                             app,
                             DOC_ITEM_ID,
-                            "Defguard Desktop Client Help",
+                            "XGuard Desktop Client Help",
                             true,
                             None::<&str>,
                         )?;
@@ -363,7 +363,7 @@ pub fn run_app() {
             // If deriving from env value fails, use config default (env overrides config file).
             let config_log_level = config.log_level;
             let start_minimized = config.start_minimized;
-            let log_level = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
+            let log_level = match &env::var("XGUARD_CLIENT_LOG_LEVEL") {
                 Ok(env_value) => LevelFilter::from_str(env_value).unwrap_or(config_log_level),
                 Err(_) => config_log_level,
             };
@@ -479,7 +479,7 @@ pub fn run_app() {
         .build(tauri::generate_context!())
         .expect("Failed to build Tauri application");
 
-    info!("Starting Defguard client version {VERSION}");
+    info!("Starting XGuard client version {VERSION}");
 
     // Run application.
     debug!("Starting the main application event loop.");
@@ -504,7 +504,7 @@ pub fn run_app() {
 
             info!(
                 "Application data (database file) will be stored in: {} and application logs in: \
-                {}. Logs of the background Defguard service responsible for managing VPN \
+                {}. Logs of the background XGuard service responsible for managing VPN \
                 connections at the network level will be stored in: {}.",
                 data_dir.display(),
                 log_dir.display(),

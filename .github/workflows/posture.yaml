@@ -22,7 +22,7 @@ jobs:
     if: false
     name: Linux postures - unencrypted
     runs-on:
-      - codebuild-defguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+      - codebuild-xguard-posture-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -44,7 +44,7 @@ jobs:
       - name: Run tests
         working-directory: src-tauri/
         run: |
-          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::linux::setup1 -- --ignored
+          cargo test -p xguard-client-posture --locked --lib inspector::tests::ci::linux::setup1 -- --ignored
 
   test-linux-postures-encrypted:
     name: Linux postures - encrypted
@@ -73,7 +73,7 @@ jobs:
       - name: Run tests
         working-directory: src-tauri/
         run: |
-          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::linux::setup2 -- --ignored
+          cargo test -p xguard-client-posture --locked --lib inspector::tests::ci::linux::setup2 -- --ignored
 
   test-windows-postures-setup1:
     name: Windows postures - setup1
@@ -98,7 +98,7 @@ jobs:
         working-directory: src-tauri/
         shell: cmd
         run: |
-          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::windows::setup1 -- --ignored
+          cargo test -p xguard-client-posture --locked --lib inspector::tests::ci::windows::setup1 -- --ignored
 
   test-windows-postures-setup2:
     name: Windows postures - setup2
@@ -123,7 +123,7 @@ jobs:
         working-directory: src-tauri/
         shell: cmd
         run: |
-          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::windows::setup2 -- --ignored
+          cargo test -p xguard-client-posture --locked --lib inspector::tests::ci::windows::setup2 -- --ignored
 
   test-macos-postures-unencrypted:
     name: macOS postures - unencrypted
@@ -145,7 +145,7 @@ jobs:
       - name: Run tests
         working-directory: src-tauri/
         run: |
-          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::macos::setup1 -- --ignored
+          cargo test -p xguard-client-posture --locked --lib inspector::tests::ci::macos::setup1 -- --ignored
 
   test-macos-postures-encrypted:
     name: macOS postures - encrypted
@@ -167,4 +167,4 @@ jobs:
       - name: Run tests
         working-directory: src-tauri/
         run: |
-          cargo test -p defguard-client-posture --locked --lib inspector::tests::ci::macos::setup2 -- --ignored
+          cargo test -p xguard-client-posture --locked --lib inspector::tests::ci::macos::setup2 -- --ignored

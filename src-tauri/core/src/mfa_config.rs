@@ -4,7 +4,7 @@
 use std::{fmt, time::Duration};
 
 use chrono::Utc;
-use defguard_client_proto::defguard::client_types::{
+use xguard_client_proto::xguard::client_types::{
     CodeMfaSetupFinishRequest, CodeMfaSetupFinishResponse, CodeMfaSetupStartRequest,
     CodeMfaSetupStartResponse, MfaConfigAuthorizeRequest, MfaConfigAuthorizeResponse,
     MfaConfigEndRequest, MfaConfigFido2ChallengeRequest, MfaConfigFido2ChallengeResponse,
@@ -25,7 +25,7 @@ use crate::{
     proxy::post_with_headers,
 };
 
-// No leading slash: it would make `Url::join` discard a proxy base path (`https://host/defguard/`).
+// No leading slash: it would make `Url::join` discard a proxy base path (`https://host/xguard/`).
 const START: &str = "api/v1/mfa-config/start";
 const SEND_CODE: &str = "api/v1/mfa-config/send-code";
 const AUTHORIZE: &str = "api/v1/mfa-config/authorize";
@@ -122,7 +122,7 @@ impl fmt::Debug for MfaConfigSession {
 #[derive(Debug, Error, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum MfaConfigError {
-    #[error("This Defguard instance does not support configuring MFA from the client")]
+    #[error("This XGuard instance does not support configuring MFA from the client")]
     Unsupported,
 
     #[error("MFA configuration session expired or was rejected")]
@@ -175,7 +175,7 @@ pub enum MfaConfigError {
     #[error("{message}")]
     NetworkError { message: String },
 
-    #[error("SMTP is not configured on this Defguard instance")]
+    #[error("SMTP is not configured on this XGuard instance")]
     SmtpNotConfigured,
 
     #[error("Proxy error (HTTP {status}): {message}")]
@@ -212,7 +212,7 @@ pub fn ensure_can_authorize_method(
     if !capabilities.can_authorize(method.into()) {
         return Err(MfaConfigError::UnsupportedMethod {
             message: format!(
-                "This Defguard instance does not accept a {} to authorize MFA configuration.",
+                "This XGuard instance does not accept a {} to authorize MFA configuration.",
                 method_name(method)
             ),
         });
@@ -252,7 +252,7 @@ fn ensure_can_configure(
     if !capabilities.can_set_up(method.into()) {
         return Err(MfaConfigError::UnsupportedMethod {
             message: format!(
-                "This Defguard instance does not support configuring a {} from the desktop client.",
+                "This XGuard instance does not support configuring a {} from the desktop client.",
                 method_name(method)
             ),
         });

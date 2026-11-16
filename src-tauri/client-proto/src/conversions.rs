@@ -6,13 +6,13 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
-use defguard_wireguard_rs::{
+use xguard_wireguard_rs::{
     host::Host, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
 };
 use tonic::Status;
 use tracing::debug;
 
-use crate::defguard::client::v1::{InterfaceConfig, InterfaceData, Peer as ProtoPeer};
+use crate::xguard::client::v1::{InterfaceConfig, InterfaceData, Peer as ProtoPeer};
 
 /// Truncates host bits from a peer allowed IP.
 ///
@@ -183,7 +183,7 @@ impl From<Host> for InterfaceData {
 mod tests {
     use std::time::SystemTime;
 
-    use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer};
+    use xguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer};
     use x25519_dalek::{EphemeralSecret, PublicKey};
 
     use super::*;

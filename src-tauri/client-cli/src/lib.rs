@@ -145,8 +145,8 @@ pub async fn cli_main() -> ExitCode {
 }
 
 /// Show the brand banner (logo + copyright + project version) on the two surfaces that need
-/// branding: `defguard-client` with no args (clap prints help; we banner first), and
-/// `defguard-client --help` / `-h`. Don't check for `--version` / `-V` – that is handled in
+/// branding: `xguard-client` with no args (clap prints help; we banner first), and
+/// `xguard-client --help` / `-h`. Don't check for `--version` / `-V` – that is handled in
 /// `check_version_flag`, which should be called before calling this function.
 fn show_banner_if_appropriate() {
     // Skip argv[0]. If user supplied any subcommand or flag other

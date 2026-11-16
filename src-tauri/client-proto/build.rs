@@ -19,61 +19,61 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // `#[serde(default)]`, so a truncated or corrupt file still fails to deserialize instead of
         // quietly becoming "no locations".
         .field_attribute(
-            ".defguard.client.v1.ServiceLocation.core_location_id",
+            ".xguard.client.v1.ServiceLocation.core_location_id",
             "#[serde(default)]",
         )
         .field_attribute(
-            ".defguard.client.v1.ServiceLocation.posture_check_required",
+            ".xguard.client.v1.ServiceLocation.posture_check_required",
             "#[serde(default)]",
         )
         // [2.2] These repeated fields are absent in responses from pre-2.2 edges.
         .field_attribute(
-            ".defguard.client_types.DeviceConfig.steps",
+            ".xguard.client_types.DeviceConfig.steps",
             "#[serde(default)]",
         )
         .field_attribute(
-            ".defguard.client_types.MfaConfigStartResponse.available_methods",
+            ".xguard.client_types.MfaConfigStartResponse.available_methods",
             "#[serde(default)]",
         )
         .field_attribute(
-            ".defguard.client_types.MfaConfigFido2ChallengeResponse.credential_ids",
+            ".xguard.client_types.MfaConfigFido2ChallengeResponse.credential_ids",
             "#[serde(default)]",
         )
         // [2.2] FIDO2 setup fields and the email fallback's recovery codes, absent on older edges.
         .field_attribute(
-            ".defguard.client_types.MfaConfigAuthorizeResponse.recovery_codes",
+            ".xguard.client_types.MfaConfigAuthorizeResponse.recovery_codes",
             "#[serde(default)]",
         )
         .field_attribute(
-            ".defguard.client_types.CodeMfaSetupStartResponse.fido2_creation_challenge",
+            ".xguard.client_types.CodeMfaSetupStartResponse.fido2_creation_challenge",
             "#[serde(default)]",
         )
         .field_attribute(
-            ".defguard.client_types.CodeMfaSetupFinishRequest.name",
+            ".xguard.client_types.CodeMfaSetupFinishRequest.name",
             "#[serde(default)]",
         )
         .field_attribute(
-            ".defguard.client_types.CodeMfaSetupFinishRequest.fido2_attestation",
+            ".xguard.client_types.CodeMfaSetupFinishRequest.fido2_attestation",
             "#[serde(default)]",
         )
         // Use proto defaults for missing fields in enrollment types that
         // may differ across proxy versions.
-        .type_attribute(".defguard.client_types.AdminInfo", "#[serde(default)]")
+        .type_attribute(".xguard.client_types.AdminInfo", "#[serde(default)]")
         .type_attribute(
-            ".defguard.client_types.InitialUserInfo",
+            ".xguard.client_types.InitialUserInfo",
             "#[serde(default)]",
         )
         .type_attribute(
-            ".defguard.client_types.EnrollmentSettings",
+            ".xguard.client_types.EnrollmentSettings",
             "#[serde(default)]",
         )
-        .type_attribute(".defguard.client_types.InstanceInfo", "#[serde(default)]")
+        .type_attribute(".xguard.client_types.InstanceInfo", "#[serde(default)]")
         .type_attribute(
-            ".defguard.client_types.MfaCapabilities",
+            ".xguard.client_types.MfaCapabilities",
             "#[serde(default)]",
         )
         .type_attribute(
-            ".defguard.client_types.EnrollmentStartResponse",
+            ".xguard.client_types.EnrollmentStartResponse",
             "#[serde(default)]",
         )
         .compile_protos(

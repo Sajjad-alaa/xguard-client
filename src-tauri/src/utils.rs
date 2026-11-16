@@ -7,22 +7,22 @@ use std::{env, process::Command};
 use std::{fs, path::Path};
 
 #[cfg(not(target_os = "macos"))]
-use defguard_client_common::{find_free_tcp_port, get_interface_name};
+use xguard_client_common::{find_free_tcp_port, get_interface_name};
 #[cfg(windows)]
-use defguard_client_core::connection::active_connections::find_connection;
+use xguard_client_core::connection::active_connections::find_connection;
 #[cfg(target_os = "macos")]
-use defguard_client_core::connection::apple::tunnel_stats;
-use defguard_client_core::connection::{bring_up, ConnectionTarget};
+use xguard_client_core::connection::apple::tunnel_stats;
+use xguard_client_core::connection::{bring_up, ConnectionTarget};
 #[cfg(not(target_os = "macos"))]
-use defguard_client_core::{
+use xguard_client_core::{
     connection::daemon_client::DAEMON_CLIENT, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
 };
 #[cfg(not(target_os = "macos"))]
-use defguard_client_proto::defguard::client::v1::{
+use xguard_client_proto::xguard::client::v1::{
     CreateInterfaceRequest, ReadInterfaceDataRequest,
 };
 #[cfg(not(target_os = "macos"))]
-use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
+use xguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use sqlx::query;
 use tauri::{AppHandle, Emitter, Manager};
 use tracing::Level;
@@ -340,11 +340,11 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                 }
             }
             Ok(None) => {
-                debug!("gRPC stream to the defguard-service managing connections has been closed");
+                debug!("gRPC stream to the xguard-service managing connections has been closed");
                 break;
             }
             Err(err) => {
-                error!("gRPC stream to the defguard-service managing connections error: {err}");
+                error!("gRPC stream to the xguard-service managing connections error: {err}");
                 break;
             }
         }
@@ -355,7 +355,7 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
 // gets targets that will be allowed by logger, this will be empty if not provided
 #[must_use]
 pub fn load_log_targets() -> Vec<String> {
-    if let Ok(targets) = env::var("DEFGUARD_CLIENT_LOG_INCLUDE") {
+    if let Ok(targets) = env::var("XGUARD_CLIENT_LOG_INCLUDE") {
         if !targets.is_empty() {
             return targets
                 .split(',')
@@ -367,12 +367,12 @@ pub fn load_log_targets() -> Vec<String> {
     Vec::new()
 }
 
-/// Default log file directory for `defguard-service` daemon.
+/// Default log file directory for `xguard-service` daemon.
 #[cfg(windows)]
-pub const DEFAULT_SERVICE_LOG_DIR: &str = "/Logs/defguard-service";
+pub const DEFAULT_SERVICE_LOG_DIR: &str = "/Logs/xguard-service";
 
 #[cfg(not(windows))]
-pub const DEFAULT_SERVICE_LOG_DIR: &str = "/var/log/defguard-service";
+pub const DEFAULT_SERVICE_LOG_DIR: &str = "/var/log/xguard-service";
 
 /// Setup client interface
 #[cfg(not(target_os = "macos"))]

@@ -620,7 +620,7 @@ mod tests {
     #[sqlx::test(migrations = "../migrations")]
     async fn test_openid_display_name_persisted_on_insert(pool: SqlitePool) {
         let mut instance = new_instance();
-        instance.openid_display_name = Some("Defguard SSO".into());
+        instance.openid_display_name = Some("XGuard SSO".into());
 
         let saved = instance.save(&pool).await.unwrap();
         let persisted = Instance::find_by_id(&pool, saved.id)
@@ -630,7 +630,7 @@ mod tests {
 
         assert_eq!(
             persisted.openid_display_name.as_deref(),
-            Some("Defguard SSO")
+            Some("XGuard SSO")
         );
     }
 

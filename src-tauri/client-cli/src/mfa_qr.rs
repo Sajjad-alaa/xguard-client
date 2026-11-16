@@ -73,7 +73,7 @@ pub(crate) fn render_qr(
 
     if is_tty && !json_mode {
         if !badge.is_empty() {
-            eprintln!("{badge}Scan this QR code with the Defguard mobile app:");
+            eprintln!("{badge}Scan this QR code with the XGuard mobile app:");
         }
         let code = QrCode::new(payload.as_bytes())
             .map_err(|e| CliError::Other(format!("Failed to generate QR code: {e}")))?;

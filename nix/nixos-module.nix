@@ -7,30 +7,30 @@
   inherit (lib) mkDefault mkEnableOption mkIf mkMerge mkOption optional types;
 
   craneLib = mkCraneLib pkgs;
-  defguard-client = pkgs.callPackage ./package.nix {inherit pkgs craneLib;};
+  xguard-client = pkgs.callPackage ./package.nix {inherit pkgs craneLib;};
 
-  svcCfg = config.services.defguard-client-daemon;
-  clientCfg = config.programs.defguard-client;
+  svcCfg = config.services.xguard-client-daemon;
+  clientCfg = config.programs.xguard-client;
 in {
-  options.services.defguard-client-daemon = {
-    enable = mkEnableOption "Defguard VPN client background service (required by both the desktop client and CLI)";
+  options.services.xguard-client-daemon = {
+    enable = mkEnableOption "XGuard VPN client background service (required by both the desktop client and CLI)";
 
     package = mkOption {
       type = types.package;
-      default = defguard-client;
-      description = "Package that provides the defguard-service binary.";
+      default = xguard-client;
+      description = "Package that provides the xguard-service binary.";
     };
 
     logLevel = mkOption {
       type = types.str;
       default = "info";
-      description = "Log level for defguard-service (--log-level)";
+      description = "Log level for xguard-service (--log-level)";
     };
 
     logDir = mkOption {
       type = types.str;
-      default = "/var/log/defguard-service";
-      description = "Directory for defguard-service logs (--log-dir)";
+      default = "/var/log/xguard-service";
+      description = "Directory for xguard-service logs (--log-dir)";
     };
 
     statsPeriod = mkOption {
@@ -40,21 +40,21 @@ in {
     };
   };
 
-  options.programs.defguard-client = {
-    enable = mkEnableOption "Defguard VPN desktop client";
+  options.programs.xguard-client = {
+    enable = mkEnableOption "XGuard VPN desktop client";
 
     package = mkOption {
       type = types.package;
-      default = defguard-client;
-      description = "defguard-client package to use";
+      default = xguard-client;
+      description = "xguard-client package to use";
     };
   };
 
   config = mkMerge [
     # Auto-enable the daemon when the desktop client is enabled.
-    # Users can override with services.defguard-client-daemon.enable = false.
+    # Users can override with services.xguard-client-daemon.enable = false.
     {
-      services.defguard-client-daemon.enable = mkDefault clientCfg.enable;
+      services.xguard-client-daemon.enable = mkDefault clientCfg.enable;
     }
 
     # Add the relevant packages to the system PATH.
@@ -67,15 +67,15 @@ in {
 
     # Daemon-only configuration: systemd service and dedicated group.
     (mkIf svcCfg.enable {
-      systemd.services.defguard-service = {
-        description = "Defguard VPN Service";
-        documentation = ["https://docs.defguard.net"];
+      systemd.services.xguard-service = {
+        description = "XGuard VPN Service";
+        documentation = ["https://docs.xguard.local"];
         wantedBy = ["multi-user.target"];
         wants = ["network-online.target"];
         after = ["network-online.target"];
         serviceConfig = {
-          Group = "defguard";
-          ExecStart = "${svcCfg.package}/bin/defguard-service --log-level ${svcCfg.logLevel} --log-dir ${svcCfg.logDir} --stats-period ${toString svcCfg.statsPeriod}";
+          Group = "xguard";
+          ExecStart = "${svcCfg.package}/bin/xguard-service --log-level ${svcCfg.logLevel} --log-dir ${svcCfg.logDir} --stats-period ${toString svcCfg.statsPeriod}";
           ExecReload = "kill -HUP $MAINPID";
           KillMode = "process";
           KillSignal = "SIGINT";
@@ -94,7 +94,7 @@ in {
         };
       };
 
-      users.groups.defguard = {};
+      users.groups.xguard = {};
     })
   ];
 }

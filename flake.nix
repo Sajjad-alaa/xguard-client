@@ -11,8 +11,8 @@
       url = "path:src-tauri/proto";
       flake = false;
     };
-    defguard-ui = {
-      url = "path:src/shared/defguard-ui";
+    xguard-ui = {
+      url = "path:src/shared/xguard-ui";
       flake = false;
     };
     boringtun = {
@@ -42,7 +42,7 @@
 
       craneLib = crane.mkLib pkgs;
 
-      defguard-client = pkgs.callPackage ./nix/package.nix {
+      xguard-client = pkgs.callPackage ./nix/package.nix {
         inherit pkgs craneLib;
       };
     in {
@@ -52,25 +52,25 @@
       };
 
       packages = {
-        default = defguard-client;
-        inherit defguard-client;
-        defguard-service =
-          pkgs.runCommand "defguard-service" {
+        default = xguard-client;
+        inherit xguard-client;
+        xguard-service =
+          pkgs.runCommand "xguard-service" {
             nativeBuildInputs = [pkgs.makeWrapper];
           } ''
             mkdir -p $out/bin
-            cp ${defguard-client}/bin/defguard-service $out/bin/
+            cp ${xguard-client}/bin/xguard-service $out/bin/
           '';
         dg =
           pkgs.runCommand "dg" {
             nativeBuildInputs = [pkgs.makeWrapper];
           } ''
             mkdir -p $out/bin
-            cp ${defguard-client}/bin/dg $out/bin/
+            cp ${xguard-client}/bin/dg $out/bin/
           '';
       };
 
-      checks.default = defguard-client;
+      checks.default = xguard-client;
 
       formatter = pkgs.alejandra;
     })

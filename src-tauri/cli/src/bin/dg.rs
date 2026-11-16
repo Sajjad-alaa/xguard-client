@@ -11,16 +11,16 @@ use std::{
 
 use clap::{builder::FalseyValueParser, command, value_parser, Arg, Command};
 use common::{dns_borrow, find_free_tcp_port, get_interface_name};
-use defguard_client_proto::conversions::normalize_allowed_ips;
+use xguard_client_proto::conversions::normalize_allowed_ips;
 #[cfg(not(target_os = "macos"))]
-use defguard_wireguard_rs::Kernel;
+use xguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
-use defguard_wireguard_rs::Userspace;
-use defguard_wireguard_rs::{
+use xguard_wireguard_rs::Userspace;
+use xguard_wireguard_rs::{
     error::WireguardInterfaceError, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
     WGApi, WireguardInterfaceApi,
 };
-use proto::defguard::client_types::{
+use proto::xguard::client_types::{
     Device, DeviceConfig, DeviceConfigResponse, EnrollmentStartRequest, EnrollmentStartResponse,
     InstanceInfo, InstanceInfoRequest, InstanceInfoResponse, NewDevice,
 };
@@ -36,10 +36,10 @@ use tracing::{debug, error, info, level_filters::LevelFilter, trace, warn};
 use tracing_subscriber::EnvFilter;
 
 mod proto {
-    pub mod defguard {
+    pub mod xguard {
         #[allow(clippy::enum_variant_names, dead_code)]
         pub mod client_types {
-            include!(concat!(env!("OUT_DIR"), "/defguard.client_types.rs"));
+            include!(concat!(env!("OUT_DIR"), "/xguard.client_types.rs"));
         }
 
         #[allow(dead_code)]
@@ -48,7 +48,7 @@ mod proto {
                 pub mod v2 {
                     include!(concat!(
                         env!("OUT_DIR"),
-                        "/defguard.enterprise.posture.v2.rs"
+                        "/xguard.enterprise.posture.v2.rs"
                     ));
                 }
             }
@@ -56,7 +56,7 @@ mod proto {
 
         pub mod proxy {
             pub mod v1 {
-                include!(concat!(env!("OUT_DIR"), "/defguard.proxy.v1.rs"));
+                include!(concat!(env!("OUT_DIR"), "/xguard.proxy.v1.rs"));
             }
         }
     }
@@ -155,8 +155,8 @@ impl CliConfig {
 
 #[derive(Debug, Error)]
 enum CliError {
-    #[error("Error while communicating with Defguard: {0}")]
-    DefguardApi(String),
+    #[error("Error while communicating with XGuard: {0}")]
+    XGuardApi(String),
     #[error("Missing data")]
     MissingData,
     #[error(transparent)]
@@ -169,7 +169,7 @@ enum CliError {
     ConfigNotFound(String),
     #[error("Couldn't parse CLI configuration at \"{0}\". Error details: {1}")]
     ConfigParse(String, String),
-    #[error("Defguard core has enterprise features disabled")]
+    #[error("XGuard core has enterprise features disabled")]
     EnterpriseDisabled,
     #[error("Failed to save configuration at {0}: {1}")]
     ConfigSave(String, String),
@@ -177,7 +177,7 @@ enum CliError {
     FreeTCPPort,
 }
 
-/// Connect to Defguard Gateway.
+/// Connect to XGuard Gateway.
 async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Result<(), CliError> {
     let network_name = config.device_config.network_name.clone();
     debug!("Connecting to network {network_name}.");
@@ -306,7 +306,7 @@ struct ApiError {
 
 /// Enroll device.
 async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
-    debug!("Starting enrollment through Defguard Proxy at {base_url}.");
+    debug!("Starting enrollment through XGuard Proxy at {base_url}.");
     let client = Client::builder().cookie_store(true).build()?;
     let mut url = base_url.clone();
     url.set_path("/api/v1/enrollment/start");
@@ -319,7 +319,7 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
     let response: EnrollmentStartResponse = if result.status() == StatusCode::OK {
         let result = result.json().await?;
         debug!(
-            "Enrollment start request has been successfully sent to Defguard Proxy. Received a \
+            "Enrollment start request has been successfully sent to XGuard Proxy. Received a \
             response, proceeding with the device configuration."
         );
         trace!("Received response: {result:?}");
@@ -327,7 +327,7 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
     } else {
         let error: ApiError = result.json().await?;
         error!("Failed to start enrolment: {}", error.error);
-        return Err(CliError::DefguardApi(error.error));
+        return Err(CliError::XGuardApi(error.error));
     };
 
     if response.instance.is_none() {
@@ -355,13 +355,13 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
     let response: DeviceConfigResponse = if result.status() == StatusCode::OK {
         let result = result.json().await?;
         debug!(
-            "The device public key has been successfully sent to Defguard Proxy. The device should \
+            "The device public key has been successfully sent to XGuard Proxy. The device should \
             be now configured on the server's end."
         );
         result
     } else {
         let error: ApiError = result.json().await?;
-        return Err(CliError::DefguardApi(format!(
+        return Err(CliError::XGuardApi(format!(
             "Failed to start enrolment: {}",
             error.error
         )));
@@ -372,11 +372,11 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
         return Err(CliError::TooManyDevices(count));
     }
     let Some(instance_info) = response.instance else {
-        error!("Missing InstanceInfo in the configuration received from Defguard Proxy.");
+        error!("Missing InstanceInfo in the configuration received from XGuard Proxy.");
         return Err(CliError::MissingData);
     };
     let Some(device) = response.device else {
-        error!("Missing Device in the configuration received from Defguard Proxy.");
+        error!("Missing Device in the configuration received from XGuard Proxy.");
         return Err(CliError::MissingData);
     };
 
@@ -395,7 +395,7 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
 const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Fetch configuration from Defguard proxy.
+/// Fetch configuration from XGuard proxy.
 async fn fetch_config(client: &Client, url: Url, token: String) -> Result<DeviceConfig, CliError> {
     let result = client
         .post(url.clone())
@@ -409,14 +409,14 @@ async fn fetch_config(client: &Client, url: Url, token: String) -> Result<Device
     } else if result.status() == StatusCode::PAYMENT_REQUIRED {
         return Err(CliError::EnterpriseDisabled);
     } else {
-        return Err(CliError::DefguardApi(format!(
+        return Err(CliError::XGuardApi(format!(
             "Received an unexpected status code {}. Expected 200 OK.",
             result.status()
         )));
     };
 
     let Some(response) = instance_response.device_config else {
-        return Err(CliError::DefguardApi(
+        return Err(CliError::XGuardApi(
             "Missing `DeviceConfigResponse` in the configuration polling response.".into(),
         ));
     };
@@ -442,7 +442,7 @@ async fn fetch_config(client: &Client, url: Url, token: String) -> Result<Device
     Ok(device_config)
 }
 
-/// Poll configuration from Defguard proxy in regular intervals.
+/// Poll configuration from XGuard proxy in regular intervals.
 /// Exit when `DeviceConfig` differs from the current one.
 async fn poll_config(config: &mut CliConfig) {
     debug!("Starting the configuration polling task.");
@@ -450,7 +450,7 @@ async fn poll_config(config: &mut CliConfig) {
     let Some(token) = config.clone().token else {
         debug!(
             "No polling token found in the CLI configuration. Make sure you are using the latest \
-            Defguard version. Exiting."
+            XGuard version. Exiting."
         );
         return;
     };
@@ -492,7 +492,7 @@ async fn poll_config(config: &mut CliConfig) {
                 debug!("Network configuration has not changed. Continuing.");
             }
             Err(CliError::EnterpriseDisabled) => {
-                debug!("Enterprise features are disabled on this Defguard instance. Skipping.");
+                debug!("Enterprise features are disabled on this XGuard instance. Skipping.");
             }
             Err(CliError::Reqwest(err)) => {
                 warn!(
@@ -608,7 +608,7 @@ async fn main() {
         Some(path) => path.clone(),
         None => {
             if let Some(mut path) = dirs_next::data_dir() {
-                path.push("net.defguard.cli");
+                path.push("local.xguard.cli");
                 if !path.exists() {
                     if let Err(err) = create_dir_all(&path) {
                         error!("Failed to create default configuration path: {err}");

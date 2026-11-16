@@ -1,7 +1,7 @@
 [Desktop Entry]
 Categories=Utility;
-Exec=defguard-client
-Icon=defguard-client
-Name=defguard-client
+Exec=xguard-client
+Icon=xguard-client
+Name=xguard-client
 Terminal=false
 Type=Application

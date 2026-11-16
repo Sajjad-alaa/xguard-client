@@ -8,15 +8,15 @@
   pnpmConfigHook,
   fetchPnpmDeps,
 }: let
-  pname = "defguard-client";
+  pname = "xguard-client";
   version = (fromTOML (builtins.readFile ../src-tauri/Cargo.toml)).workspace.package.version;
 
   desktopItem = makeDesktopItem {
     name = pname;
     exec = pname;
     icon = pname;
-    desktopName = "Defguard";
-    genericName = "Defguard VPN Client";
+    desktopName = "XGuard";
+    genericName = "XGuard VPN Client";
     categories = ["Network" "Security"];
   };
 
@@ -88,7 +88,7 @@
 
   # Prefetch pnpm dependencies for the new UI (separate pnpm project).
   newUiPnpmDeps = fetchPnpmDeps {
-    pname = "defguard-client-new-ui";
+    pname = "xguard-client-new-ui";
     inherit version pnpm;
     src = ../new-ui;
     fetcherVersion = 4;
@@ -97,7 +97,7 @@
 
   # Pre-build the new UI frontend so Tauri can serve it as WebviewUrl::App("compact/") and "full/".
   newUiDist = pkgs.stdenv.mkDerivation {
-    pname = "defguard-client-new-ui";
+    pname = "xguard-client-new-ui";
     inherit version;
     src = ../new-ui;
     nativeBuildInputs = [nodejs pnpm pnpmConfigHook];
@@ -141,9 +141,9 @@ in
       # Workspace-member build scripts were compiled in buildDepsOnly's source
       # tree (/build/source/) with that path baked in; remove them so cargo
       # recompiles them against the current tree.  Dep .rlib/.rmeta are kept.
-      rm -rf src-tauri/target/release/build/defguard*
+      rm -rf src-tauri/target/release/build/xguard*
       rm -rf src-tauri/target/release/build/common*
-      rm -rf src-tauri/target/release/.fingerprint/defguard*
+      rm -rf src-tauri/target/release/.fingerprint/xguard*
       rm -rf src-tauri/target/release/.fingerprint/common*
 
       # tauri_build::build() reads OUT_DIR metadata written by tauri's own
@@ -180,7 +180,7 @@ in
 
       mkdir -p $out/bin
       install -Dm755 "$targetDir/${pname}"         $out/bin/${pname}
-      install -Dm755 "$targetDir/defguard-service" $out/bin/defguard-service
+      install -Dm755 "$targetDir/xguard-service" $out/bin/xguard-service
       install -Dm755 "$targetDir/dg"               $out/bin/dg
 
       mkdir -p $out/lib/${pname}
@@ -217,8 +217,8 @@ in
     };
 
     meta = with lib; {
-      description = "Defguard VPN Client";
-      homepage = "https://defguard.net";
+      description = "XGuard VPN Client";
+      homepage = "https://xguard.local";
       # license = licenses.gpl3Only;
       maintainers = with maintainers; [wojcik91];
       platforms = platforms.linux;

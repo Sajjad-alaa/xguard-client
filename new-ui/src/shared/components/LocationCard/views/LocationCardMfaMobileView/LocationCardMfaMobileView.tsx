@@ -49,7 +49,7 @@ export const LocationCardMfaMobileView = () => {
       <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
         {!isPresent(qrValue) && <p>Preparing authentication...</p>}
         {isPresent(qrValue) && (
-          <p>Open your Defguard mobile app and scan the QR code you see below.</p>
+          <p>Open your XGuard mobile app and scan the QR code you see below.</p>
         )}
       </LocationViewHeader>
       {isPresent(qrValue) && (

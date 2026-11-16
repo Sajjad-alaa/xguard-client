@@ -27,14 +27,14 @@
         "type": "github"
       }
     },
-    "defguard-ui": {
+    "xguard-ui": {
       "flake": false,
       "locked": {
-        "path": "src/shared/defguard-ui",
+        "path": "src/shared/xguard-ui",
         "type": "path"
       },
       "original": {
-        "path": "src/shared/defguard-ui",
+        "path": "src/shared/xguard-ui",
         "type": "path"
       },
       "parent": []
@@ -102,7 +102,7 @@
       "inputs": {
         "boringtun": "boringtun",
         "crane": "crane",
-        "defguard-ui": "defguard-ui",
+        "xguard-ui": "xguard-ui",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
         "proto": "proto",
