@@ -1,6 +1,5 @@
 use std::io::{stderr, stdin, IsTerminal};
 
-use xguard_client_posture::{authorize_posture_session, get_posture_data};
 use xguard_client_proto::xguard::client_types::MfaMethod;
 use xguard_core::{
     connection::{active_state::active_state, bring_up, ConnectionTarget},
@@ -120,17 +119,6 @@ pub async fn handle(
                         CliError::Other(format!("Instance {} not found", location.instance_id))
                     })?;
 
-                // When posture is also required, collect posture data and pass it
-                // into the MFA start request so the server can validate both together.
-                let posture_data = if location.posture_check_required {
-                    Some(
-                        get_posture_data()
-                            .await
-                            .map_err(|e| CliError::Other(e.to_string()))?,
-                    )
-                } else {
-                    None
-                };
 
                 let psk = if multistep {
                     let psk = mfa::authorize_multistep(
@@ -138,7 +126,6 @@ pub async fn handle(
                         code_command,
                         &plan,
                         &instance,
-                        posture_data,
                         &state.pool,
                         qr_file,
                         json,
@@ -161,13 +148,12 @@ pub async fn handle(
                     }
                     psk
                 } else if plan[0] == MfaMethod::Oidc {
-                    mfa::authorize_oidc(location, &instance, posture_data, &state.pool, json)
+                    mfa::authorize_oidc(location, &instance, &state.pool, json)
                         .await?
                 } else if plan[0] == MfaMethod::MobileApprove {
                     mfa::authorize_mobile_approve(
                         location,
                         &instance,
-                        posture_data,
                         qr_file,
                         &state.pool,
                         json,
@@ -195,7 +181,6 @@ pub async fn handle(
                         &source,
                         &instance,
                         plan[0],
-                        posture_data,
                         &state.pool,
                     )
                     .await?
@@ -206,11 +191,13 @@ pub async fn handle(
                     state.app_config.mtu(),
                 )
             } else if location.posture_check_required {
-                // Posture only (no MFA).
-                let psk = authorize_posture_session(location)
-                    .await
-                    .map_err(|e| CliError::Other(e.to_string()))?;
-                (location.name.clone(), psk, state.app_config.mtu())
+                // Only a pre-fork server can ask for this; connecting without the check would be
+                // refused by it anyway, so fail early with a clear reason.
+                return Err(CliError::Other(format!(
+                    "Location '{}' requires a device posture check, which XGuard does not \
+                     support.",
+                    location.name
+                )));
             } else {
                 (location.name.clone(), None, state.app_config.mtu())
             }

@@ -16,7 +16,6 @@ use xguard_client_proto::xguard::{
         MfaRemoteRejectionReason, MfaStartRejectionReason, MfaStepRejection, MfaStepResult,
         MfaStepStarted,
     },
-    enterprise::posture::v2::DevicePostureData,
 };
 use futures_util::{SinkExt, StreamExt};
 use reqwest::{Response, StatusCode, Url};
@@ -66,9 +65,6 @@ pub enum MfaError {
     #[error("MFA rejected: {message}")]
     MfaRejected { message: String },
 
-    #[error("Posture check failed: {message}")]
-    PostureRejected { message: String },
-
     #[error("{message}")]
     AttemptLimit { message: String },
 
@@ -88,7 +84,6 @@ pub enum MfaError {
 pub struct MfaStartRequest {
     pub location_id: i64,
     pub pubkey: String,
-    pub posture_data: Option<DevicePostureData>,
     pub selected_methods: Vec<MfaMethod>,
 }
 
@@ -212,11 +207,10 @@ async fn check_mfa_response(response: Response) -> Result<Response, MfaError> {
     let message = read_error_message(response).await;
 
     match status {
-        // A 403 means either a posture failure or an attempt-limit error. The message tells them apart.
+        // A 403 is either the attempt limit or a plain refusal. The message tells them apart.
         StatusCode::FORBIDDEN if message == ATTEMPT_LIMIT_MESSAGE => {
             Err(MfaError::AttemptLimit { message })
         }
-        StatusCode::FORBIDDEN => Err(MfaError::PostureRejected { message }),
         StatusCode::UNAUTHORIZED => Err(MfaError::MfaRejected { message }),
         _ if status.is_client_error() => Err(MfaError::MfaRejected { message }),
         _ => Err(MfaError::ProxyError {
@@ -319,7 +313,6 @@ pub async fn mfa_start(
                 location_id: request.location_id,
                 pubkey: request.pubkey,
                 method: first_method as i32,
-                posture_data: request.posture_data,
             };
             client.post(url).json(&request)
         }
@@ -327,7 +320,6 @@ pub async fn mfa_start(
             let request = MfaFlowStartRequest {
                 location_id: request.location_id,
                 pubkey: request.pubkey,
-                posture_data: request.posture_data,
                 selected_methods: selected_methods.clone(),
             };
             client.post(url).json(&request)

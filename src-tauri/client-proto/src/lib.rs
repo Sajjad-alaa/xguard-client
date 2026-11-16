@@ -1,5 +1,4 @@
 pub mod conversions;
-pub mod posture_ext;
 
 pub mod xguard {
     #[allow(clippy::enum_variant_names)]
@@ -19,11 +18,4 @@ pub mod xguard {
         }
     }
 
-    pub mod enterprise {
-        pub mod posture {
-            pub mod v2 {
-                tonic::include_proto!("xguard.enterprise.posture.v2");
-            }
-        }
-    }
 }

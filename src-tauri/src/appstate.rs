@@ -7,7 +7,6 @@ use xguard_client_core::{
     connection::active_connections::ACTIVE_CONNECTIONS, enrollment::EnrollmentSession,
     mfa::MfaAuthSession, mfa_config::MfaConfigSession,
 };
-use xguard_client_provisioning::ProvisioningConfig;
 use tauri::{
     async_runtime::{spawn, JoinHandle},
     PhysicalPosition,
@@ -43,15 +42,13 @@ pub struct AppState {
     pub app_config: Mutex<AppConfig>,
     pub tray_click_position: Mutex<Option<PhysicalPosition<f64>>>,
     stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
-    pub provisioning_config: Mutex<Option<ProvisioningConfig>>,
-    pub provisioning_instance_id: Mutex<Option<String>>,
     pub pending_add_instance: Mutex<Option<AddInstancePayload>>,
     pub session_state: Mutex<SessionState>,
 }
 
 impl AppState {
     #[must_use]
-    pub fn new(config: AppConfig, provisioning_config: Option<ProvisioningConfig>) -> Self {
+    pub fn new(config: AppConfig) -> Self {
         Self {
             enrollment_sessions: Mutex::new(HashMap::new()),
             mfa_config_sessions: Mutex::new(HashMap::new()),
@@ -62,8 +59,6 @@ impl AppState {
             app_config: Mutex::new(config),
             tray_click_position: Mutex::new(None),
             stat_threads: Mutex::new(HashMap::new()),
-            provisioning_config: Mutex::new(provisioning_config),
-            provisioning_instance_id: Mutex::new(None),
             pending_add_instance: Mutex::new(None),
             session_state: Mutex::new(SessionState::default()),
         }

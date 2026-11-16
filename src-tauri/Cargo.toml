@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "enterprise/fido2", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations"]
+members = ["cli", "client-cli", "common", "client-proto", "core", "daemon"]
 default-members = ["cli", "client-cli", "daemon", "."]
 
 [workspace.dependencies]
@@ -8,13 +8,11 @@ async-stream = "0.3"
 base64 = "0.23"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.6", features = ["cargo", "derive", "env"] }
-ctap-hid-fido2 = "3.6"
 xguard_wireguard_rs = { git = "https://github.com/Sajjad-alaa/xguard-wireguard-rs.git", rev = "2b201e5272bc214c05bb912c72ec241a580e04eb", version = "0.12" }
 dirs-next = "2.0"
 futures-core = "0.3"
 futures-util = "0.3"
 hex = "0.4"
-http = "1"
 hyper-util = "0.1"
 image = "0.25"
 known-folders = "1.3"
@@ -35,7 +33,6 @@ serde_with = "3.23"
 sqlx = { version = "0.9", features = ["chrono", "json", "runtime-tokio", "sqlite", "uuid", "macros"] }
 struct-patch = "0.12"
 strum = { version = "0.28", features = ["derive"] }
-sysinfo = { version = "0.39", default-features = false, features = ["apple-app-store", "system"] }
 tempfile = "3"
 thiserror = "2.0"
 time = { version = "0.3", features = ["formatting", "macros"] }
@@ -131,12 +128,8 @@ redundant_closure = "warn"
 base64.workspace = true
 chrono.workspace = true
 xguard-cli.path = "client-cli"
-xguard-client-fido2.path = "enterprise/fido2"
 xguard-client-proto.path = "client-proto"
 xguard-client-core.path = "core"
-xguard-client-posture.path = "enterprise/posture"
-xguard-client-config-sync.path = "enterprise/config-sync"
-xguard-client-provisioning.path = "enterprise/provisioning"
 xguard-client-common.path = "common"
 xguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 log.workspace = true

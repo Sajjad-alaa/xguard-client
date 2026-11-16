@@ -13,8 +13,6 @@ base64.workspace = true
 chrono.workspace = true
 clap.workspace = true
 common = { package = "xguard-client-common", path = "../common" }
-xguard_client_config_sync = { package = "xguard-client-config-sync", path = "../enterprise/config-sync" }
-xguard_client_posture = { package = "xguard-client-posture", path = "../enterprise/posture" }
 xguard_client_proto = { package = "xguard-client-proto", path = "../client-proto" }
 xguard_core = { package = "xguard-client-core", path = "../core" }
 image.workspace = true

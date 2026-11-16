@@ -145,7 +145,7 @@ export const resolveMfaStepPlan = (
   instance?: MfaUsabilityInstance,
 ): MfaMethodValue[] => {
   const steps = mfaStepsOf(location);
-  // Core keeps a step whose methods it filtered out (FIDO2 without a license), and no plan passes it.
+  // Core keeps a step whose methods it filtered out (e.g. unsupported FIDO2), and no plan passes it.
   if (steps.some((step) => step.methods.length === 0)) return [];
 
   return steps.map((step, index) => {

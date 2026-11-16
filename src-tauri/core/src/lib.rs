@@ -25,6 +25,7 @@ pub mod database;
 pub mod enrollment;
 pub mod error;
 pub mod events;
+pub mod instance_sync;
 pub mod mfa;
 pub mod mfa_config;
 pub mod mfa_contract;

@@ -27,7 +27,7 @@ use xguard_core::{
         DbPool,
     },
     mfa_contract::MfaContract,
-    proto::{client::v1::ListInterfacesResponse, enterprise::posture::v2::DevicePostureData},
+    proto::client::v1::ListInterfacesResponse,
     ConnectionType,
 };
 use tempfile::{tempdir, TempDir};
@@ -103,12 +103,6 @@ impl DesktopDaemonService for MockDaemon {
         Err(Status::unimplemented("not mocked"))
     }
 
-    async fn get_posture_data(
-        &self,
-        _req: Request<()>,
-    ) -> Result<Response<DevicePostureData>, Status> {
-        Err(Status::unimplemented("not mocked"))
-    }
 
     async fn list_interfaces(
         &self,

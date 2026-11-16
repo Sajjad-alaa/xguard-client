@@ -76,7 +76,6 @@ fn start_request() -> MfaStartRequest {
     MfaStartRequest {
         location_id: 1,
         pubkey: "pk".into(),
-        posture_data: None,
         selected_methods: vec![MfaMethod::Totp],
     }
 }
@@ -290,21 +289,21 @@ async fn test_mfa_start_attempt_limit_on_403() {
 }
 
 #[tokio::test]
-async fn test_mfa_start_posture_rejected_on_403() {
-    // A non-cap 403 must remain a dedicated posture rejection.
+async fn test_mfa_start_forbidden_is_rejection() {
+    // A 403 that isn't the attempt limit is a plain MFA rejection.
     let server = MockServer::start().await;
 
     Mock::given(method("POST"))
         .and(path("/api/v1/client-mfa/start"))
         .respond_with(
-            ResponseTemplate::new(403).set_body_json(json!({ "error": "firewall enabled" })),
+            ResponseTemplate::new(403).set_body_json(json!({ "error": "access denied" })),
         )
         .mount(&server)
         .await;
 
     let url = mock_url(&server);
     let err = mfa_start(url, start_request()).await.unwrap_err();
-    assert!(matches!(err, MfaError::PostureRejected { .. }));
+    assert!(matches!(err, MfaError::MfaRejected { .. }));
 }
 
 #[tokio::test]

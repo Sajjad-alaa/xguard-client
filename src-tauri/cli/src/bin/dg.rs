@@ -42,18 +42,6 @@ mod proto {
             include!(concat!(env!("OUT_DIR"), "/xguard.client_types.rs"));
         }
 
-        #[allow(dead_code)]
-        pub mod enterprise {
-            pub mod posture {
-                pub mod v2 {
-                    include!(concat!(
-                        env!("OUT_DIR"),
-                        "/xguard.enterprise.posture.v2.rs"
-                    ));
-                }
-            }
-        }
-
         pub mod proxy {
             pub mod v1 {
                 include!(concat!(env!("OUT_DIR"), "/xguard.proxy.v1.rs"));
@@ -169,8 +157,8 @@ enum CliError {
     ConfigNotFound(String),
     #[error("Couldn't parse CLI configuration at \"{0}\". Error details: {1}")]
     ConfigParse(String, String),
-    #[error("XGuard core has enterprise features disabled")]
-    EnterpriseDisabled,
+    #[error("XGuard core does not serve configuration polling")]
+    PollingUnsupported,
     #[error("Failed to save configuration at {0}: {1}")]
     ConfigSave(String, String),
     #[error("Failed to find free TCP port")]
@@ -406,8 +394,13 @@ async fn fetch_config(client: &Client, url: Url, token: String) -> Result<Device
 
     let instance_response: InstanceInfoResponse = if result.status() == StatusCode::OK {
         result.json().await?
-    } else if result.status() == StatusCode::PAYMENT_REQUIRED {
-        return Err(CliError::EnterpriseDisabled);
+    } else if matches!(
+        result.status(),
+        StatusCode::PAYMENT_REQUIRED | StatusCode::PRECONDITION_REQUIRED
+    ) {
+        // 428: XGuard core doesn't serve configuration polling; 402: pre-fork servers without
+        // the feature enabled. Either way there is nothing to apply.
+        return Err(CliError::PollingUnsupported);
     } else {
         return Err(CliError::XGuardApi(format!(
             "Received an unexpected status code {}. Expected 200 OK.",
@@ -491,8 +484,8 @@ async fn poll_config(config: &mut CliConfig) {
                 }
                 debug!("Network configuration has not changed. Continuing.");
             }
-            Err(CliError::EnterpriseDisabled) => {
-                debug!("Enterprise features are disabled on this XGuard instance. Skipping.");
+            Err(CliError::PollingUnsupported) => {
+                debug!("This XGuard instance does not serve configuration polling. Skipping.");
             }
             Err(CliError::Reqwest(err)) => {
                 warn!(

@@ -10,26 +10,18 @@ use xguard_client_core::{
         disconnect_interface, ConflictingConnection, ConnectionTarget,
     },
     enrollment::{self},
+    instance_sync::apply_device_config,
     mfa::{self, MfaAuthSession},
     mfa_config::{self, AuthorizeProof, MfaConfigError, MfaConfigSession, SetupProof},
     mfa_contract::MfaContract,
 };
-use xguard_client_fido2::{pin_policy, Assertion, Fido2Error, PinPolicy, PlatformContext};
-use xguard_client_posture::authorize_posture_session;
 #[cfg(not(target_os = "macos"))]
-use xguard_client_proto::xguard::client::v1::{
-    DeleteServiceLocationsRequest, RemoveInterfaceRequest,
+use xguard_client_proto::xguard::client::v1::RemoveInterfaceRequest;
+use xguard_client_proto::xguard::client_types::{
+    mfa_step_result, AdminInfo, CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse,
+    DeviceConfigResponse, EnrollmentSettings, InitialUserInfo, InstanceInfo as ProtoInstanceInfo,
+    MfaConfigAuthorizeResponse, MfaFido2Assertion, MfaMethod,
 };
-use xguard_client_proto::xguard::{
-    client_types::{
-        mfa_step_result, AdminInfo, CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse,
-        DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
-        InstanceInfo as ProtoInstanceInfo, MfaConfigAuthorizeResponse, MfaFido2Assertion,
-        MfaMethod,
-    },
-    enterprise::posture::v2::DevicePostureData,
-};
-use xguard_client_provisioning::{clear_provisioning_config, ProvisioningConfig};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
@@ -57,13 +49,11 @@ use crate::{
     error::Error,
     events::{AddInstancePayload, EventKey, TunnelsDisabledPayload, TunnelsEnabledPayload},
     fido2_window::{platform_context, WindowLevelGuard},
+    security_key::{self, pin_policy, Assertion, Fido2Error, PinPolicy, PlatformContext},
     into_location,
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
-    },
-    periodic::config::{
-        do_update_instance, poll_instance_with_events, sync_service_locations_best_effort,
     },
     proxy::construct_platform_header,
     tauri_err_to_app_err,
@@ -76,7 +66,11 @@ use crate::{
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
 #[cfg(not(target_os = "macos"))]
-use crate::{periodic::config::sync_service_locations, utils::execute_command};
+use crate::utils::execute_command;
+
+/// Reported wherever a server asks for a device posture check, which XGuard does not perform.
+const POSTURE_UNSUPPORTED: &str = "This location requires a device posture check, which XGuard \
+    does not support yet";
 
 #[derive(Debug, Serialize, thiserror::Error)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -224,7 +218,6 @@ fn mfa_error_is_terminal(error: &mfa::MfaError) -> bool {
     match error {
         mfa::MfaError::Cancelled
         | mfa::MfaError::AttemptLimit { .. }
-        | mfa::MfaError::PostureRejected { .. }
         | mfa::MfaError::MfaRejected { .. }
         | mfa::MfaError::MobileClientOutdated
         | mfa::MfaError::Other { .. } => true,
@@ -284,14 +277,11 @@ pub async fn connect(
                 .into());
             }
             // Connect-time MFA brings the tunnel up itself (keeping the preshared
-            // key backend-side), so the only preshared key resolved here is for
-            // posture-only locations.
-            let preshared_key = if location.posture_check_required {
-                authorize_posture_session(&location).await?
-            } else {
-                None
-            };
-            connect_location_with_psk(location, preshared_key, &handle).await?;
+            // key backend-side), so a plain connection never carries one.
+            if location.posture_check_required {
+                return Err(Error::PostureCheckFailed(POSTURE_UNSUPPORTED.into()).into());
+            }
+            connect_location_with_psk(location, None, &handle).await?;
         } else {
             error!(
                 "Location with ID {location_id} not found in the database, aborting connection \
@@ -373,33 +363,6 @@ pub async fn disconnect(
         debug!("Event emitted successfully");
         stop_log_watcher_task(&handle, &connection.interface_name)?;
         reload_tray_menu(&handle).await;
-        if connection_type == ConnectionType::Location {
-            let name = get_tunnel_or_location_name(location_id, connection_type).await;
-            if let Err(err) = maybe_update_instance_config(location_id, &handle).await {
-                match err {
-                    Error::CoreNotEnterprise => {
-                        debug!(
-                            "Tried to fetch instance config from core after disconnecting from \
-                            {name}(ID: {location_id}), but the core is not enterprise, so we \
-                            can't fetch the config."
-                        );
-                    }
-                    Error::NoToken => {
-                        debug!(
-                            "Tried to fetch instance config from core after disconnecting from \
-                            {name}(ID: {location_id}), but this location's instance has no \
-                            polling token, so we can't fetch the config."
-                        );
-                    }
-                    _ => {
-                        warn!(
-                            "Error while trying to fetch instance config after disconnecting \
-                            from {name}(ID: {location_id}): {err}"
-                        );
-                    }
-                }
-            };
-        }
         // Update tray icon to reflect connection state.
         configure_tray_icon(&handle).await?;
 
@@ -489,28 +452,6 @@ pub async fn disconnect_locations(location_ids: Vec<Id>, handle: AppHandle) -> R
                 error!("Failed to disconnect location {name}(ID: {location_id}): {err}");
             }
             stop_log_watcher_task(&handle, &connection.interface_name)?;
-            if let Err(err) = maybe_update_instance_config(location_id, &handle).await {
-                match err {
-                    Error::CoreNotEnterprise => {
-                        debug!(
-                            "Tried to fetch instance config from core after disconnecting from \
-                            {name}(ID: {location_id}), but the core is not enterprise."
-                        );
-                    }
-                    Error::NoToken => {
-                        debug!(
-                            "Tried to fetch instance config from core after disconnecting from \
-                            {name}(ID: {location_id}), but the instance has no polling token."
-                        );
-                    }
-                    _ => {
-                        warn!(
-                            "Error while trying to fetch instance config after disconnecting \
-                            from {name}(ID: {location_id}): {err}"
-                        );
-                    }
-                }
-            }
             info!("Disconnected from location {name}(ID: {location_id})");
             any_disconnected = true;
         } else {
@@ -529,36 +470,16 @@ pub async fn disconnect_locations(location_ids: Vec<Id>, handle: AppHandle) -> R
     Ok(())
 }
 
-/// Triggers poll on location's instance config. Config will be updated if there are no more active
-/// connections for this instance.
-async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Result<(), Error> {
-    let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? else {
-        error!("Location {location_id} not found, skipping config update check");
-        return Err(Error::NotFound);
-    };
-    refresh_instance_config(location.instance_id, handle).await
-}
 
-/// Emits `InstanceUpdate` so the frontend refetches whatever the poll changed.
+/// Asks the frontend to refetch the instance after its MFA state may have changed.
+///
+/// The server-side state is not re-fetched here: that needs instance configuration sync, which
+/// XGuard does not provide yet. The next enrollment or manual update brings it in.
 async fn refresh_instance_config(instance_id: Id, handle: &AppHandle) -> Result<(), Error> {
-    let mut transaction = DB_POOL.begin().await?;
-    let Some(mut instance) = Instance::find_by_id(&mut *transaction, instance_id).await? else {
-        error!("Instance {instance_id} not found, skipping config update check");
-        return Err(Error::NotFound);
-    };
-    let instance_changed =
-        poll_instance_with_events(&mut transaction, &mut instance, handle).await?;
-    transaction.commit().await?;
-
-    sync_service_locations_best_effort(&DB_POOL, &instance).await;
-    if instance_changed {
-        reload_tray_menu(handle).await;
-    }
-
+    debug!("Refreshing the frontend view of instance {instance_id}");
     handle
         .emit(EventKey::InstanceUpdate.into(), ())
-        .map_err(tauri_err_to_app_err)?;
-    Ok(())
+        .map_err(tauri_err_to_app_err)
 }
 
 #[derive(Serialize)]
@@ -567,44 +488,6 @@ pub struct SaveDeviceConfigResponse {
     instance: Instance<Id>,
 }
 
-/// Drops the in-memory provisioning config after any instance is saved, and removes
-/// `provisioning.json` only when the saved instance was enrolled with its token.
-/// Errors are logged, never returned, because the instance is already committed.
-fn clear_provisioning_after_instance_save(handle: &AppHandle, saved_instance_uuid: &str) {
-    let app_state = handle.state::<AppState>();
-    match app_state.provisioning_config.lock() {
-        Ok(mut provisioning_config) => {
-            if provisioning_config.take().is_some() {
-                debug!("Cleared in-memory provisioning config after saving an instance");
-            }
-        }
-        Err(_) => warn!("Failed to clear in-memory provisioning config"),
-    }
-
-    let mut provisioning_instance_id = match app_state.provisioning_instance_id.lock() {
-        Ok(provisioning_instance_id) => provisioning_instance_id,
-        Err(_) => {
-            warn!("Failed to check provisioning instance id");
-            return;
-        }
-    };
-    if provisioning_instance_id.as_deref() == Some(saved_instance_uuid) {
-        match handle.path().app_data_dir() {
-            Ok(app_data_dir) => {
-                if let Err(err) = clear_provisioning_config(&app_data_dir) {
-                    warn!(
-                        "Failed to remove provisioning config file from {}: {err}",
-                        app_data_dir.display()
-                    );
-                }
-            }
-            Err(err) => {
-                warn!("Failed to resolve app data directory for provisioning cleanup: {err}");
-            }
-        }
-        *provisioning_instance_id = None;
-    }
-}
 
 #[tauri::command(async)]
 pub async fn save_device_config(
@@ -664,8 +547,6 @@ pub async fn save_device_config(
     }
     transaction.commit().await?;
 
-    clear_provisioning_after_instance_save(&handle, &instance.uuid);
-
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
 
@@ -687,23 +568,10 @@ pub async fn save_device_config(
     Ok(res)
 }
 
-#[cfg(target_os = "macos")]
-async fn push_service_locations(_instance: &Instance<Id>) -> Result<Vec<Location<Id>>, Error> {
-    // Nothing here... yet
-
-    Ok(Vec::new())
-}
-
-/// Pushes the instance's service locations to the daemon and returns all of its locations.
-///
-/// Delegates to [`sync_service_locations`] rather than building its own request, so the pushed
-/// field set cannot drift from the config-sync path.
-#[cfg(not(target_os = "macos"))]
+/// Returns all of the instance's locations.
 async fn push_service_locations(instance: &Instance<Id>) -> Result<Vec<Location<Id>>, Error> {
     let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, true).await?;
     trace!("Created following locations: {locations:#?}");
-
-    sync_service_locations(&DB_POOL, instance).await?;
 
     Ok(locations)
 }
@@ -923,13 +791,11 @@ pub async fn update_instance(
                 Error::ResourceNotFound("instance info in device config response".to_string())
             })?;
         let mut transaction = DB_POOL.begin().await?;
-        let locations_changed =
-            do_update_instance(&mut transaction, &mut instance, response).await?;
+        let summary = apply_device_config(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
+        debug!("Updated instance {instance}: {summary:?}");
 
-        sync_service_locations_best_effort(&DB_POOL, &instance).await;
-
-        if locations_changed {
+        if summary.locations_changed() {
             if let Err(err) = app_handle.emit(EventKey::InstanceUpdated.into(), ()) {
                 error!("Failed to emit instance-updated event: {err}");
             }
@@ -1229,19 +1095,6 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
     if was_disabled && !Instance::tunnels_disabled(&*DB_POOL).await? {
         TunnelsEnabledPayload::emit(&handle);
     }
-
-    client
-        .delete_service_locations(DeleteServiceLocationsRequest {
-            instance_id: instance.uuid.clone(),
-        })
-        .await
-        .map_err(|err| {
-            error!(
-                "Error while deleting service locations from the daemon for instance {}({}): {err}",
-                instance.name, instance.id,
-            );
-            Error::InternalError(err.to_string())
-        })?;
 
     reload_tray_menu(&handle).await;
 
@@ -1553,21 +1406,11 @@ pub async fn command_set_app_config(
     Ok(res)
 }
 
+/// Provisioning files (pre-seeded enrollment) are not supported yet, so there is never one.
 #[tauri::command]
-pub fn get_provisioning_config(
-    app_state: State<'_, AppState>,
-) -> Result<Option<ProvisioningConfig>, Error> {
-    debug!("Running command get_provisioning_config.");
-    let res = app_state
-        .provisioning_config
-        .lock()
-        .map_err(|_err| {
-            error!("Failed to acquire lock on client provisioning config");
-            Error::StateLockFail
-        })?
-        .clone();
-    trace!("Returning config: {res:?}");
-    Ok(res)
+#[must_use]
+pub fn get_provisioning_config() -> Option<()> {
+    None
 }
 
 #[tauri::command]
@@ -1592,10 +1435,10 @@ pub fn get_platform_header() -> String {
     construct_platform_header()
 }
 
+/// Device posture reports are not supported yet.
 #[tauri::command(async)]
-pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
-    debug!("Received a command to prepare posture report");
-    xguard_client_posture::get_posture_data().await
+pub async fn get_posture_data() -> Result<(), Error> {
+    Err(Error::PostureCheckFailed(POSTURE_UNSUPPORTED.into()))
 }
 
 #[derive(Debug, Serialize)]
@@ -1648,15 +1491,6 @@ pub async fn enrollment_start(
     state: State<'_, AppState>,
 ) -> Result<EnrollmentStartResult, String> {
     debug!("Starting enrollment at {proxy_url}");
-    let uses_provisioning_token = match state.provisioning_config.lock() {
-        Ok(provisioning_config) => provisioning_config
-            .as_ref()
-            .is_some_and(|config| config.enrollment_token == token),
-        Err(_) => {
-            warn!("Failed to read in-memory provisioning config");
-            false
-        }
-    };
     let url = Url::parse(&proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
     let (session, response) = enrollment::enrollment_start(url, token)
         .await
@@ -1673,10 +1507,6 @@ pub async fn enrollment_start(
         .as_ref()
         .map_or("<unknown>", |u| u.login.as_str());
     info!("Enrollment started for user {login}, session {session_id}");
-    let provisioning_instance_id = response
-        .instance
-        .as_ref()
-        .map(|instance| instance.id.clone());
     let user = response
         .user
         .ok_or_else(|| "Proxy did not return user info".to_string())?;
@@ -1689,14 +1519,6 @@ pub async fn enrollment_start(
     let instance = response
         .instance
         .ok_or_else(|| "Proxy did not return instance info".to_string())?;
-    if uses_provisioning_token {
-        if let Some(instance_id) = provisioning_instance_id {
-            match state.provisioning_instance_id.lock() {
-                Ok(mut provisioning_instance_id) => *provisioning_instance_id = Some(instance_id),
-                Err(_) => warn!("Failed to remember provisioning instance id"),
-            }
-        }
-    }
     Ok(EnrollmentStartResult {
         session_id,
         user,
@@ -2021,19 +1843,12 @@ async fn mfa_start_request(
         .ensure_no_route_conflict(&DB_POOL, None)
         .await
         .map_err(|err| err.to_string())?;
-    let posture_data = if location.posture_check_required {
-        Some(
-            xguard_client_posture::get_posture_data()
-                .await
-                .map_err(|e| format!("Failed to collect posture data: {e}"))?,
-        )
-    } else {
-        None
-    };
+    if location.posture_check_required {
+        return Err(POSTURE_UNSUPPORTED.into());
+    }
     Ok(mfa::MfaStartRequest {
         location_id: location.network_id,
         pubkey: keys.pubkey,
-        posture_data,
         selected_methods: step_methods.to_vec(),
     })
 }
@@ -2404,6 +2219,7 @@ impl Drop for CeremonyGuard<'_> {
 /// `ceremony` names the half that failed, so the same mapping serves both.
 fn fido2_message(err: &Fido2Error, ceremony: &str) -> String {
     match err {
+        Fido2Error::Unsupported => "Security keys are not supported by XGuard yet".to_string(),
         Fido2Error::NoDevice => "No security key detected".to_string(),
         // The CTAP backend cannot choose between keys yet.
         Fido2Error::MultipleDevices => {
@@ -2529,7 +2345,7 @@ async fn fido2_assertion(
     context: PlatformContext,
     cancel: CancellationToken,
 ) -> Result<Assertion, mfa::MfaError> {
-    xguard_client_fido2::assert_for_mfa(
+    security_key::assert_for_mfa(
         &rp_id,
         &challenge.challenge,
         &challenge.credential_ids,
@@ -2917,7 +2733,7 @@ pub async fn mfa_config_authorize_fido2(
     let _ = handle.emit(EventKey::MfaConfigFido2Touch.into(), ());
     // the prompt must not open behind the window that asked for it
     let level = WindowLevelGuard::lower(&window);
-    let assertion = xguard_client_fido2::assert_for_mfa(
+    let assertion = security_key::assert_for_mfa(
         &rp_id,
         &challenge.challenge,
         &challenge.credential_ids,
@@ -3117,7 +2933,7 @@ pub async fn mfa_config_setup_fido2(
     let _ = handle.emit(EventKey::MfaConfigFido2Touch.into(), ());
     // the prompt must not open behind the window that asked for it
     let _level = WindowLevelGuard::lower(&window);
-    let attestation = xguard_client_fido2::register_security_key(
+    let attestation = security_key::register_security_key(
         &challenge,
         &instance_url,
         pin,
@@ -3257,7 +3073,6 @@ mod tests {
         mfa::MfaStartRequest {
             location_id: 1,
             pubkey: "pk".into(),
-            posture_data: None,
             selected_methods: vec![method],
         }
     }
@@ -3365,7 +3180,7 @@ mod tests {
 
     #[test]
     fn test_mfa_route_is_bound_to_its_location_and_original_proxy() {
-        let state = AppState::new(AppConfig::default(), None);
+        let state = AppState::new(AppConfig::default());
         let proxy_url = Url::parse("https://original-proxy.example.com").unwrap();
         remember_mfa_auth_session(
             &state,
@@ -3387,7 +3202,7 @@ mod tests {
 
     #[test]
     fn test_mfa_route_cleanup_does_not_remove_replacement() {
-        let state = AppState::new(AppConfig::default(), None);
+        let state = AppState::new(AppConfig::default());
         let route = || MfaAuthSession {
             contract: MfaContract::MultiStep,
             step_attempt_id: Some("attempt-1".into()),
@@ -3418,7 +3233,7 @@ mod tests {
 
     #[test]
     fn test_mfa_route_cleanup_follows_task_outcome() {
-        let state = AppState::new(AppConfig::default(), None);
+        let state = AppState::new(AppConfig::default());
         let route = || MfaAuthSession {
             contract: MfaContract::MultiStep,
             step_attempt_id: Some("attempt-1".into()),
@@ -3503,7 +3318,7 @@ mod tests {
 
     #[test]
     fn test_mfa_code_rejection_keeps_route_for_retry() {
-        let state = AppState::new(AppConfig::default(), None);
+        let state = AppState::new(AppConfig::default());
         let route = MfaAuthSession {
             contract: MfaContract::MultiStep,
             step_attempt_id: Some("attempt-1".into()),
@@ -3909,7 +3724,7 @@ mod tests {
 
     #[test]
     fn test_mfa_config_cancel_before_the_ceremony_expires_the_session() {
-        let state = AppState::new(AppConfig::default(), None);
+        let state = AppState::new(AppConfig::default());
         let uid = live_session(&state);
 
         cancel_mfa_config_session(&state, uid);
@@ -3921,7 +3736,7 @@ mod tests {
 
     #[test]
     fn test_mfa_config_cancel_during_the_ceremony_cancels_the_token() {
-        let state = AppState::new(AppConfig::default(), None);
+        let state = AppState::new(AppConfig::default());
         let uid = live_session(&state);
         let ceremony = CeremonyGuard::register(&state, uid).expect("first ceremony registers");
         assert!(!ceremony.is_cancelled());
@@ -3935,7 +3750,7 @@ mod tests {
 
     #[test]
     fn test_mfa_config_cancel_after_the_ceremony_clears_both_maps() {
-        let state = AppState::new(AppConfig::default(), None);
+        let state = AppState::new(AppConfig::default());
         let uid = live_session(&state);
         drop(CeremonyGuard::register(&state, uid).expect("ceremony registers"));
 
@@ -3947,7 +3762,7 @@ mod tests {
 
     #[test]
     fn test_mfa_config_cancel_of_an_unknown_session_is_harmless() {
-        let state = AppState::new(AppConfig::default(), None);
+        let state = AppState::new(AppConfig::default());
 
         cancel_mfa_config_session(&state, Uuid::new_v4());
 
@@ -3957,7 +3772,7 @@ mod tests {
 
     #[test]
     fn test_mfa_config_abort_attempt_cancels_the_token_and_keeps_the_session() {
-        let state = AppState::new(AppConfig::default(), None);
+        let state = AppState::new(AppConfig::default());
         let uid = live_session(&state);
         let attempt = CeremonyGuard::register(&state, uid).expect("attempt registers");
 
@@ -3971,7 +3786,7 @@ mod tests {
 
     #[test]
     fn test_ceremony_guard_rejects_a_second_claim() {
-        let state = AppState::new(AppConfig::default(), None);
+        let state = AppState::new(AppConfig::default());
         let uid = live_session(&state);
         let _first = CeremonyGuard::register(&state, uid).expect("first ceremony registers");
 
@@ -3985,7 +3800,7 @@ mod tests {
 
     #[test]
     fn test_ceremony_guard_drop_leaves_a_newer_ceremony_alone() {
-        let state = AppState::new(AppConfig::default(), None);
+        let state = AppState::new(AppConfig::default());
         let uid = live_session(&state);
         let first = CeremonyGuard::register(&state, uid).expect("first ceremony registers");
         cancel_mfa_config_session(&state, uid);
@@ -4012,7 +3827,7 @@ mod tests {
 
     #[test]
     fn test_get_mfa_config_session_prunes_an_expired_entry() {
-        let state = AppState::new(AppConfig::default(), None);
+        let state = AppState::new(AppConfig::default());
         let uid = Uuid::new_v4();
         store_config_session(&state, uid, Utc::now().timestamp() - 1);
 

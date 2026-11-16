@@ -14,9 +14,7 @@ use std::{
 };
 
 use clap::builder::{PossibleValue, PossibleValuesParser};
-use xguard_client_proto::xguard::{
-    client_types::MfaMethod, enterprise::posture::v2::DevicePostureData,
-};
+use xguard_client_proto::xguard::client_types::MfaMethod;
 use xguard_core::{
     database::{
         models::{
@@ -52,7 +50,6 @@ fn into_cli(err: mfa::MfaError) -> CliError {
         | mfa::MfaError::ProxyError { .. }
         | mfa::MfaError::Other { .. } => CliError::Other(msg),
         mfa::MfaError::MfaRejected { .. }
-        | mfa::MfaError::PostureRejected { .. }
         | mfa::MfaError::AttemptLimit { .. }
         | mfa::MfaError::MobileClientOutdated
         | mfa::MfaError::Timeout => CliError::MfaFailed(msg),
@@ -361,7 +358,6 @@ async fn start_session(
     location: &Location<Id>,
     instance: &Instance<Id>,
     selected_methods: Vec<MfaMethod>,
-    posture_data: Option<DevicePostureData>,
     pool: &DbPool,
 ) -> Result<(Url, mfa::MfaStartResponse, MfaContract), CliError> {
     let wireguard_keys = WireguardKeys::find_by_instance_id(pool, instance.id)
@@ -386,7 +382,6 @@ async fn start_session(
         mfa::MfaStartRequest {
             location_id: location.network_id,
             pubkey: wireguard_keys.pubkey,
-            posture_data,
             selected_methods,
         },
     )
@@ -420,13 +415,12 @@ pub(crate) async fn authorize(
     source: &CodeSource,
     instance: &Instance<Id>,
     method: MfaMethod,
-    posture_data: Option<DevicePostureData>,
     pool: &DbPool,
 ) -> Result<SecretString, CliError> {
     check_code_method(method)?;
 
     let (proxy_url, info, contract) =
-        start_session(location, instance, vec![method], posture_data, pool).await?;
+        start_session(location, instance, vec![method], pool).await?;
 
     let ctx = MfaContext {
         instance: instance.name.clone(),
@@ -465,7 +459,6 @@ pub(crate) async fn authorize_multistep(
     code_command: Option<&str>,
     plan: &[MfaMethod],
     instance: &Instance<Id>,
-    posture_data: Option<DevicePostureData>,
     pool: &DbPool,
     qr_file: Option<&str>,
     json_mode: bool,
@@ -481,7 +474,7 @@ pub(crate) async fn authorize_multistep(
         plan.len()
     );
     let (proxy_url, info, contract) =
-        start_session(location, instance, plan.to_vec(), posture_data, pool).await?;
+        start_session(location, instance, plan.to_vec(), pool).await?;
 
     let token = info.token;
     let mut first_step = Some(info.first_step);
@@ -743,7 +736,6 @@ async fn run_mobile_step(
 pub(crate) async fn authorize_oidc(
     location: &Location<Id>,
     instance: &Instance<Id>,
-    posture_data: Option<DevicePostureData>,
     pool: &DbPool,
     json_mode: bool,
 ) -> Result<SecretString, CliError> {
@@ -751,7 +743,6 @@ pub(crate) async fn authorize_oidc(
         location,
         instance,
         vec![MfaMethod::Oidc],
-        posture_data,
         pool,
     )
     .await?;
@@ -780,7 +771,6 @@ pub(crate) async fn authorize_oidc(
 pub(crate) async fn authorize_mobile_approve(
     location: &Location<Id>,
     instance: &Instance<Id>,
-    posture_data: Option<DevicePostureData>,
     qr_file: Option<&str>,
     pool: &DbPool,
     json_mode: bool,
@@ -789,7 +779,6 @@ pub(crate) async fn authorize_mobile_approve(
         location,
         instance,
         vec![MfaMethod::MobileApprove],
-        posture_data,
         pool,
     )
     .await?;

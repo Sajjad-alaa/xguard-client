@@ -35,7 +35,6 @@ use crate::{
     },
     events::handle_deep_link,
     periodic::run_periodic_tasks,
-    provisioning::handle_client_initialization,
     session_state::{self, PersistedSessionState},
     tray::{configure_tray_icon, setup_tray},
     utils::{load_log_targets, DEFAULT_SERVICE_LOG_DIR},
@@ -428,17 +427,12 @@ pub fn run_app() {
             // run DB migrations
             async_runtime::block_on(handle_db_migrations());
 
-            // Check if client needs to be initialized
-            // and try to load provisioning config if necessary
-            let provisioning_config =
-                async_runtime::block_on(handle_client_initialization(app_handle));
-
             let mut persisted_session = PersistedSessionState::load(&config_dir);
             if async_runtime::block_on(persisted_session.resolve(&DB_POOL)) {
                 persisted_session.save(&config_dir);
             }
 
-            let state = AppState::new(config, provisioning_config)
+            let state = AppState::new(config)
                 .with_session_state(persisted_session.into());
             app.manage(state);
 
