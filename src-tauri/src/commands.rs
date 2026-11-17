@@ -790,10 +790,20 @@ pub async fn update_instance(
             .ok_or_else(|| {
                 Error::ResourceNotFound("instance info in device config response".to_string())
             })?;
+        let tunnels_were_disabled = Instance::tunnels_disabled(&*DB_POOL).await?;
         let mut transaction = DB_POOL.begin().await?;
         let summary = apply_device_config(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
         debug!("Updated instance {instance}: {summary:?}");
+
+        // The administrator may have switched bare tunnels off or on since the last refresh.
+        let tunnels_disabled = Instance::tunnels_disabled(&*DB_POOL).await?;
+        if tunnels_disabled && !tunnels_were_disabled {
+            info!("Tunnels disabled by the administrator of {instance}, disconnecting tunnels");
+            disconnect_all_tunnels(&app_handle).await?;
+        } else if !tunnels_disabled && tunnels_were_disabled {
+            TunnelsEnabledPayload::emit(&app_handle);
+        }
 
         if summary.locations_changed() {
             if let Err(err) = app_handle.emit(EventKey::InstanceUpdated.into(), ()) {

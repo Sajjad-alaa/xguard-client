@@ -688,9 +688,17 @@ impl Location<NoId> {
 
 impl<I> Location<I> {
     /// Resolve the MTU to set on this location's interface.
+    ///
+    /// `mtu` is the MTU pinned in the local settings, `client_mtu` the one XGuard sent (the
+    /// location's value or the user's group override). When both are set the lower one wins: the
+    /// administrator's value is an upper bound the path is known to carry, and a user may still
+    /// go lower for their own network, but not higher.
     #[must_use]
     pub fn effective_mtu(&self, mtu: Option<u32>) -> Option<u32> {
-        mtu.or(self.client_mtu)
+        match (mtu, self.client_mtu) {
+            (Some(local), Some(server)) => Some(local.min(server)),
+            (local, server) => local.or(server),
+        }
     }
 
     pub fn is_service_location(&self) -> bool {
@@ -822,8 +830,9 @@ mod tests {
         location.client_mtu = Some(1380);
         assert_eq!(location.effective_mtu(None), Some(1380));
 
-        // An MTU pinned in the settings overrides the core-provided one.
-        assert_eq!(location.effective_mtu(Some(1420)), Some(1420));
+        // An MTU pinned in the settings may go below the core-provided one, not above it.
+        assert_eq!(location.effective_mtu(Some(1420)), Some(1380));
+        assert_eq!(location.effective_mtu(Some(1280)), Some(1280));
 
         // ...and is used even when the core sent nothing.
         location.client_mtu = None;

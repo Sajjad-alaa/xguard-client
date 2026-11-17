@@ -31,3 +31,8 @@
     padding-top: var(--spacing-3xl);
   }
 }
+
+.location-view-default .locked-routing {
+  color: var(--fg-muted);
+  font: var(--t-body-sm-400);
+}

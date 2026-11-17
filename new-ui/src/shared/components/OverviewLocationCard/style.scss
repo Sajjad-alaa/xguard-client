@@ -46,5 +46,11 @@
     flex-flow: row nowrap;
     column-gap: var(--spacing-5xl);
     min-height: 40px;
+
+    .locked-routing {
+      align-self: center;
+      color: var(--fg-muted);
+      font: var(--t-body-sm-400);
+    }
   }
 }
