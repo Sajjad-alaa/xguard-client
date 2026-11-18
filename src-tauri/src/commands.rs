@@ -2318,7 +2318,10 @@ impl Drop for CeremonyGuard<'_> {
 /// `ceremony` names the half that failed, so the same mapping serves both.
 fn fido2_message(err: &Fido2Error, ceremony: &str) -> String {
     match err {
-        Fido2Error::Unsupported => "Security keys are not supported by XGuard yet".to_string(),
+        Fido2Error::Unsupported => {
+            "Security keys are not supported by the XGuard client on this operating system yet"
+                .to_string()
+        }
         Fido2Error::NoDevice => "No security key detected".to_string(),
         // The CTAP backend cannot choose between keys yet.
         Fido2Error::MultipleDevices => {
@@ -2344,7 +2347,10 @@ fn fido2_message(err: &Fido2Error, ceremony: &str) -> String {
              dialog rather than a phone or Windows Hello"
                 .to_string()
         }
-        Fido2Error::PinRequired => "This security key needs a PIN".to_string(),
+        Fido2Error::PinRequired => {
+            "This security key needs a PIN. Set one with the key vendor's tool, then try again"
+                .to_string()
+        }
         Fido2Error::PinInvalid | Fido2Error::PinBlocked => {
             format!("Security key rejected the PIN: {err}")
         }
@@ -2438,14 +2444,14 @@ async fn fido2_challenge(
 ///
 /// `pin` is `None` where the platform collects it in its own dialog.
 async fn fido2_assertion(
-    rp_id: String,
+    instance_url: Url,
     challenge: Fido2Challenge,
     pin: Option<String>,
     context: PlatformContext,
     cancel: CancellationToken,
 ) -> Result<Assertion, mfa::MfaError> {
     security_key::assert_for_mfa(
-        &rp_id,
+        &instance_url,
         &challenge.challenge,
         &challenge.credential_ids,
         pin,
@@ -2465,7 +2471,7 @@ async fn fido2_assertion(
 /// Runs the FIDO2 exchange and returns the MFA result.
 async fn run_fido2_mfa(
     proxy_url: Url,
-    rp_id: String,
+    instance_url: Url,
     start: Fido2Start,
     pin: Option<String>,
     window: WebviewWindow,
@@ -2502,7 +2508,7 @@ async fn run_fido2_mfa(
         // Handed to the ceremony rather than raced against here, since only the platform can take
         // its own modal dialog down.
         let assertion = fido2_assertion(
-            rp_id,
+            instance_url,
             challenge,
             pin,
             platform_context(&window),
@@ -2549,13 +2555,10 @@ async fn run_fido2_mfa(
     result
 }
 
-/// Returns the host the security key must use for this instance.
-fn fido2_rp_id(instance: &Instance<Id>) -> Result<String, String> {
-    Url::parse(&instance.url)
-        .map_err(|err| format!("Invalid instance URL: {err}"))?
-        .host_str()
-        .map(ToString::to_string)
-        .ok_or_else(|| format!("Instance URL {} has no host", instance.url))
+/// The instance URL a security key is bound to: its domain is the relying party and its origin
+/// goes into the signed client data.
+fn fido2_instance_url(instance: &Instance<Id>) -> Result<Url, String> {
+    Url::parse(&instance.url).map_err(|err| format!("Invalid instance URL: {err}"))
 }
 
 /// Starts FIDO2 verification in the background.
@@ -2596,7 +2599,7 @@ pub async fn mfa_fido2_pin(
             Url::parse(&instance.proxy_url).map_err(|err| format!("Invalid Edge URL: {err}"))?
         }
     };
-    let rp_id = fido2_rp_id(&instance)?;
+    let instance_url = fido2_instance_url(&instance)?;
     let contract = route
         .as_ref()
         .map_or(instance.mfa_contract, |route| route.contract);
@@ -2619,7 +2622,17 @@ pub async fn mfa_fido2_pin(
         EventKey::MfaFido2StepAdvanced,
         EventKey::MfaFido2Error,
         session_route,
-        move |cancel| run_fido2_mfa(proxy_url, rp_id, start, pin, window, cancel, task_handle),
+        move |cancel| {
+            run_fido2_mfa(
+                proxy_url,
+                instance_url,
+                start,
+                pin,
+                window,
+                cancel,
+                task_handle,
+            )
+        },
     ))
 }
 
@@ -2813,7 +2826,7 @@ pub async fn mfa_config_authorize_fido2(
         .await
         .map_err(|err| mfa_config_other(err.to_string()))?
         .ok_or_else(|| mfa_config_other("Instance not found"))?;
-    let rp_id = fido2_rp_id(&instance).map_err(mfa_config_other)?;
+    let instance_url = fido2_instance_url(&instance).map_err(mfa_config_other)?;
 
     let challenge = mfa_config::mfa_config_fido2_challenge(
         session.proxy_url.clone(),
@@ -2833,7 +2846,7 @@ pub async fn mfa_config_authorize_fido2(
     // the prompt must not open behind the window that asked for it
     let level = WindowLevelGuard::lower(&window);
     let assertion = security_key::assert_for_mfa(
-        &rp_id,
+        &instance_url,
         &challenge.challenge,
         &challenge.credential_ids,
         pin,
