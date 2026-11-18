@@ -43,13 +43,14 @@ use crate::{
 };
 
 /// Convert a `xguard_core::mfa::MfaError` into a [`CliError`].
-fn into_cli(err: mfa::MfaError) -> CliError {
+pub(crate) fn into_cli(err: mfa::MfaError) -> CliError {
     let msg = err.to_string();
     match err {
         mfa::MfaError::NetworkError { .. }
         | mfa::MfaError::ProxyError { .. }
         | mfa::MfaError::Other { .. } => CliError::Other(msg),
         mfa::MfaError::MfaRejected { .. }
+        | mfa::MfaError::PostureRejected { .. }
         | mfa::MfaError::AttemptLimit { .. }
         | mfa::MfaError::MobileClientOutdated
         | mfa::MfaError::Timeout => CliError::MfaFailed(msg),
@@ -374,6 +375,12 @@ async fn start_session(
         .map_err(|e| CliError::Other(format!("Invalid proxy URL: {e}")))?;
     check_proxy_scheme(&proxy_url);
 
+    // Locations with posture policies check the device while MFA starts.
+    let posture = if location.posture_check_required {
+        Some(xguard_core::posture::collect().await)
+    } else {
+        None
+    };
     debug!("Starting MFA session for location {}", location.name);
     let contract = instance.mfa_contract;
     let start = mfa::mfa_start(
@@ -383,6 +390,7 @@ async fn start_session(
             location_id: location.network_id,
             pubkey: wireguard_keys.pubkey,
             selected_methods,
+            posture,
         },
     )
     .await

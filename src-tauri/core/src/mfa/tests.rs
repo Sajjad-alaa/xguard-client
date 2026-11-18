@@ -77,6 +77,66 @@ fn start_request() -> MfaStartRequest {
         location_id: 1,
         pubkey: "pk".into(),
         selected_methods: vec![MfaMethod::Totp],
+        posture: None,
+    }
+}
+
+#[tokio::test]
+async fn test_mfa_start_sends_posture_and_maps_rejection() {
+    use xguard_client_proto::xguard::client_types::{DevicePostureFacts, PostureOs};
+
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/v1/mfa-flow/start"))
+        .and(body_partial_json(json!({
+            "location_id": 1,
+            "posture": {"os": PostureOs::Linux as i32, "firewall_enabled": false},
+        })))
+        .respond_with(ResponseTemplate::new(403).set_body_json(json!({
+            "error": "Device posture check failed: firewall is required",
+            "code": "posture_rejected",
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let request = MfaStartRequest {
+        posture: Some(DevicePostureFacts {
+            os: PostureOs::Linux as i32,
+            client_version: "2.2.0".into(),
+            firewall_enabled: Some(false),
+            ..Default::default()
+        }),
+        ..start_request()
+    };
+    match super::mfa_start(MfaContract::MultiStep, mock_url(&server), request)
+        .await
+        .unwrap_err()
+    {
+        MfaError::PostureRejected { message } => {
+            assert!(message.contains("firewall is required"), "{message}");
+        }
+        other => panic!("expected PostureRejected, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn test_plain_403_is_not_a_posture_rejection() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .respond_with(
+            ResponseTemplate::new(403)
+                .set_body_json(json!({"error": "device is not assigned to location"})),
+        )
+        .mount(&server)
+        .await;
+    match mfa_start(mock_url(&server), start_request())
+        .await
+        .unwrap_err()
+    {
+        MfaError::MfaRejected { message } => assert!(message.contains("not assigned")),
+        other => panic!("expected MfaRejected, got {other:?}"),
     }
 }
 

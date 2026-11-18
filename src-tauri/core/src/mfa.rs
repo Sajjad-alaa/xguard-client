@@ -10,7 +10,7 @@ use xguard_client_proto::xguard::{
         mfa_flow_start_response,
         mfa_flow_step_finish_request::Submission as MfaFlowFinishSubmission, mfa_step_result,
         mfa_step_started, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
-        ClientMfaStartResponse, MfaAdvanced, MfaCodeCredential, MfaCompleted, MfaFido2Assertion,
+        ClientMfaStartResponse, DevicePostureFacts, MfaAdvanced, MfaCodeCredential, MfaCompleted, MfaFido2Assertion,
         MfaFlowRemoteRejected, MfaFlowStartRequest, MfaFlowStartResponse, MfaFlowStepFinishRequest,
         MfaFlowStepFinishResponse, MfaFlowStepStartRequest, MfaFlowStepStartResponse, MfaMethod,
         MfaRemoteRejectionReason, MfaStartRejectionReason, MfaStepRejection, MfaStepResult,
@@ -36,7 +36,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     database::models::Id,
     mfa_contract::MfaContract,
-    proxy::{construct_platform_header, http_client, read_error_message},
+    proxy::{construct_platform_header, http_client},
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
 
@@ -65,6 +65,10 @@ pub enum MfaError {
     #[error("MFA rejected: {message}")]
     MfaRejected { message: String },
 
+    /// The device does not meet the location's posture policies.
+    #[error("{message}")]
+    PostureRejected { message: String },
+
     #[error("{message}")]
     AttemptLimit { message: String },
 
@@ -85,6 +89,8 @@ pub struct MfaStartRequest {
     pub location_id: i64,
     pub pubkey: String,
     pub selected_methods: Vec<MfaMethod>,
+    /// Device posture facts, sent when the location has posture policies.
+    pub posture: Option<DevicePostureFacts>,
 }
 
 #[derive(Debug)]
@@ -204,12 +210,22 @@ async fn check_mfa_response(response: Response) -> Result<Response, MfaError> {
         return Ok(response);
     }
 
-    let message = read_error_message(response).await;
+    let body: serde_json::Value = response.json().await.unwrap_or_default();
+    let message = body
+        .get("error")
+        .and_then(serde_json::Value::as_str)
+        .map_or_else(|| format!("HTTP {status}"), str::to_string);
+    let code = body.get("code").and_then(serde_json::Value::as_str);
 
     match status {
-        // A 403 is either the attempt limit or a plain refusal. The message tells them apart.
+        // A 403 is the attempt limit, a posture refusal or a plain refusal.
         StatusCode::FORBIDDEN if message == ATTEMPT_LIMIT_MESSAGE => {
             Err(MfaError::AttemptLimit { message })
+        }
+        _ if crate::posture::is_posture_rejection(status, code, &message) => {
+            Err(MfaError::PostureRejected {
+                message: crate::posture::rejection_reasons(&message),
+            })
         }
         StatusCode::UNAUTHORIZED => Err(MfaError::MfaRejected { message }),
         _ if status.is_client_error() => Err(MfaError::MfaRejected { message }),
@@ -313,6 +329,7 @@ pub async fn mfa_start(
                 location_id: request.location_id,
                 pubkey: request.pubkey,
                 method: first_method as i32,
+                posture: request.posture,
             };
             client.post(url).json(&request)
         }
@@ -321,6 +338,7 @@ pub async fn mfa_start(
                 location_id: request.location_id,
                 pubkey: request.pubkey,
                 selected_methods: selected_methods.clone(),
+                posture: request.posture,
             };
             client.post(url).json(&request)
         }
