@@ -27,7 +27,9 @@ import {
   type TunnelsDisabledPayload,
 } from '../rust-api/types';
 import { useAppStore } from '../store/useAppStore';
+import { configChangedMessage } from '../utils/configSync';
 import { resolveMfaStepPlan, shouldStartMfa } from '../utils/mfa';
+import { Snackbar } from './snackbar/snackbar';
 
 const urlOrigin = (url: string): string => {
   try {
@@ -195,8 +197,12 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
         void queryClient.invalidateQueries({ queryKey: ['latest-app-version'] });
       }),
 
-      listen(TauriEvent.ConfigChanged, (event) => {
+      listen<string>(TauriEvent.ConfigChanged, (event) => {
         void debug(`UI Received event ConfigChanged: ${JSON.stringify(event.payload)}`);
+        if (typeof event.payload === 'string' && event.payload.length > 0) {
+          // Sent by config sync when a connected MFA location changed on the server.
+          Snackbar.default(configChangedMessage(event.payload));
+        }
         void queryClient.invalidateQueries({ queryKey: ['settings'] });
         void queryClient.invalidateQueries({ queryKey: ['provisioning-config'] });
         void queryClient.invalidateQueries({ queryKey: ['instances'] });

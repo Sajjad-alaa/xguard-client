@@ -1,17 +1,12 @@
-use std::{
-    ffi::OsString,
-    result::Result,
-    sync::mpsc,
-    time::Duration,
-};
+use std::{ffi::OsString, result::Result, sync::mpsc, time::Duration};
 
 use clap::Parser;
 use tokio::runtime::Runtime;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 use windows_service::{
     define_windows_service,
     service::{
-        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState,
+        PowerEventParam, ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState,
         ServiceStatus, ServiceType,
     },
     service_control_handler::{register, ServiceControlHandlerResult},
@@ -21,6 +16,7 @@ use windows_service::{
 use crate::{
     config::Config,
     daemon::{run_server, DaemonError},
+    service_locations::wake_reconciler,
     utils::logging_setup,
 };
 
@@ -60,8 +56,23 @@ fn run_service() -> Result<(), DaemonError> {
                 ServiceControlHandlerResult::NoError
             }
 
+            // Tunnels from before a suspend look alive but pass no traffic: re-check now.
             ServiceControl::PowerEvent(param) => {
                 debug!("Received power event: {param:?}");
+                if matches!(
+                    param,
+                    PowerEventParam::ResumeAutomatic | PowerEventParam::ResumeSuspend
+                ) {
+                    info!("Resumed from sleep, checking service locations");
+                    wake_reconciler();
+                }
+                ServiceControlHandlerResult::NoError
+            }
+
+            // Sign-in and sign-out switch pre-logon service locations.
+            ServiceControl::SessionChange(param) => {
+                debug!("Received session change: {:?}", param.reason);
+                wake_reconciler();
                 ServiceControlHandlerResult::NoError
             }
 
@@ -79,7 +90,9 @@ fn run_service() -> Result<(), DaemonError> {
         status_handle.set_service_status(ServiceStatus {
             service_type: SERVICE_TYPE,
             current_state: ServiceState::Running,
-            controls_accepted: ServiceControlAccept::STOP | ServiceControlAccept::POWER_EVENT,
+            controls_accepted: ServiceControlAccept::STOP
+                | ServiceControlAccept::POWER_EVENT
+                | ServiceControlAccept::SESSION_CHANGE,
             exit_code: ServiceExitCode::Win32(0),
             checkpoint: 0,
             wait_hint: Duration::default(),

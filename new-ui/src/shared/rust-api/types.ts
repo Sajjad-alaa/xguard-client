@@ -143,6 +143,7 @@ export const TauriCommand = {
   SetAutostartEnabled: 'set_autostart_enabled',
   // Misc
   GetProvisioningConfig: 'get_provisioning_config',
+  SyncInstancesNow: 'sync_instances_now',
   TakePendingAddInstance: 'take_pending_add_instance',
   GetPlatformHeader: 'get_platform_header',
   GetLatestAppVersion: 'get_latest_app_version',

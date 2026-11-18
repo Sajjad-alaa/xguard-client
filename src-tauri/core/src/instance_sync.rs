@@ -26,6 +26,14 @@ pub struct SyncSummary {
     pub added: usize,
     pub updated: usize,
     pub removed: usize,
+    /// Local IDs of the locations that were removed.
+    pub removed_ids: Vec<Id>,
+    /// Local IDs of updated locations whose tunnel settings changed (address, keys, endpoint,
+    /// routes, DNS, MTU, keepalive, MFA or service mode): a live tunnel no longer matches them.
+    /// Renames and other display-only changes are not listed.
+    pub tunnel_changed_ids: Vec<Id>,
+    /// The client traffic policy changed, so the routing of every live tunnel may be stale.
+    pub traffic_policy_changed: bool,
 }
 
 impl SyncSummary {
@@ -58,10 +66,12 @@ pub async fn apply_device_config(
         )));
     }
 
+    let policy_before = instance.client_traffic_policy.clone();
     let mut summary = SyncSummary {
         instance_changed: update_instance(instance, info, response.token),
         ..SyncSummary::default()
     };
+    summary.traffic_policy_changed = instance.client_traffic_policy != policy_before;
     if summary.instance_changed {
         instance.save(&mut *conn).await?;
     }
@@ -77,9 +87,13 @@ pub async fn apply_device_config(
         let incoming = into_location(config, instance.id);
         match existing.remove(&incoming.network_id) {
             Some(mut current) => {
+                let tunnel_changed = tunnel_settings_differ(&current, &incoming);
                 if merge_location(&mut current, incoming) {
                     current.save(&mut *conn).await?;
                     summary.updated += 1;
+                    if tunnel_changed {
+                        summary.tunnel_changed_ids.push(current.id);
+                    }
                 }
             }
             None => {
@@ -93,7 +107,10 @@ pub async fn apply_device_config(
         debug!("Removing location {stale}, it is no longer assigned to this device");
         stale.delete(&mut *conn).await?;
         summary.removed += 1;
+        summary.removed_ids.push(stale.id);
     }
+    summary.removed_ids.sort_unstable();
+    summary.tunnel_changed_ids.sort_unstable();
 
     Ok(summary)
 }
@@ -134,6 +151,21 @@ fn update_instance(
         changed = true;
     }
     changed
+}
+
+/// Whether a tunnel built from `current` would differ from one built from `incoming`.
+fn tunnel_settings_differ(current: &Location<Id>, incoming: &Location) -> bool {
+    current.address != incoming.address
+        || current.pubkey != incoming.pubkey
+        || current.endpoint != incoming.endpoint
+        || current.allowed_ips != incoming.allowed_ips
+        || current.dns != incoming.dns
+        || current.keepalive_interval != incoming.keepalive_interval
+        || current.client_mtu != incoming.client_mtu
+        || current.location_mfa_mode != incoming.location_mfa_mode
+        || current.mfa_steps != incoming.mfa_steps
+        || current.service_location_mode != incoming.service_location_mode
+        || current.posture_check_required != incoming.posture_check_required
 }
 
 /// Replaces the server-owned fields of `current` with those of `incoming`, keeping the user's

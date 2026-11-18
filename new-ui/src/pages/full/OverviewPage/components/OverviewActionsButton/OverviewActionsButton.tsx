@@ -160,6 +160,19 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
     const config: MenuItemsGroup[] = [
       {
         items: [
+          ...(isInstance
+            ? [
+                {
+                  text: 'Sync configuration now',
+                  icon: 'refresh' as const,
+                  onClick: () => {
+                    api.syncInstancesNow().catch((e: unknown) => {
+                      error(`Failed to request configuration sync, ${String(e)}`);
+                    });
+                  },
+                },
+              ]
+            : []),
           {
             text: isInstance ? 'Refresh configuration' : 'Edit tunnel',
             icon: 'refresh',

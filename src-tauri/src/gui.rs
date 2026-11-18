@@ -8,16 +8,16 @@ use std::{
     thread::spawn,
 };
 
+use log::{Level, LevelFilter};
+use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
+use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_log::{Target, TargetKind};
 #[cfg(target_os = "macos")]
 use xguard_client_core::connection::sync_locations_and_tunnels;
 use xguard_client_core::{
     connection::active_connections::close_all_connections,
     version::{check_app_version, should_show_welcome, VersionCheckResult},
 };
-use log::{Level, LevelFilter};
-use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
-use tauri_plugin_deep_link::DeepLinkExt;
-use tauri_plugin_log::{Target, TargetKind};
 
 #[cfg(unix)]
 use crate::set_perms;
@@ -35,6 +35,7 @@ use crate::{
     },
     events::handle_deep_link,
     periodic::run_periodic_tasks,
+    provisioning::handle_client_initialization,
     session_state::{self, PersistedSessionState},
     tray::{configure_tray_icon, setup_tray},
     utils::{load_log_targets, DEFAULT_SERVICE_LOG_DIR},
@@ -193,6 +194,7 @@ pub fn run_app() {
             command_get_app_config,
             command_set_app_config,
             get_provisioning_config,
+            sync_instances_now,
             take_pending_add_instance,
             get_platform_header,
             get_posture_data,
@@ -432,8 +434,11 @@ pub fn run_app() {
                 persisted_session.save(&config_dir);
             }
 
+            // A provisioning file (deployed by an administrator) pre-fills the first enrollment.
+            let provisioning = async_runtime::block_on(handle_client_initialization(app_handle));
             let state = AppState::new(config)
-                .with_session_state(persisted_session.into());
+                .with_session_state(persisted_session.into())
+                .with_provisioning(provisioning);
             app.manage(state);
 
             // Pre-build windows hidden so they can be shown/hidden without recreation.

@@ -9,25 +9,6 @@ use std::{
 #[cfg(unix)]
 use std::{fs, path::Path};
 
-use xguard_client_common::dns_borrow;
-use xguard_client_proto::{
-    conversions::normalize_allowed_ips,
-    xguard::{
-        client::v1::{
-            desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-            CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
-            ListInterfacesResponse, ManagedInterfaceData, ReadInterfaceDataRequest,
-            RemoveInterfaceRequest, SaveServiceLocationsRequest,
-        },
-    },
-};
-#[cfg(not(target_os = "macos"))]
-use xguard_wireguard_rs::Kernel;
-#[cfg(target_os = "macos")]
-use xguard_wireguard_rs::Userspace;
-use xguard_wireguard_rs::{
-    error::WireguardInterfaceError, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
-};
 #[cfg(target_os = "linux")]
 use nix::unistd::{chown, Group};
 #[cfg(unix)]
@@ -46,12 +27,52 @@ use tonic::{
     Code, Response, Status,
 };
 use tracing::{debug, error, info, info_span, warn, Instrument};
+use xguard_client_common::dns_borrow;
+use xguard_client_proto::{
+    conversions::normalize_allowed_ips,
+    xguard::client::v1::{
+        desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
+        CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
+        ListInterfacesResponse, ManagedInterfaceData, ReadInterfaceDataRequest,
+        RemoveInterfaceRequest, SaveServiceLocationsRequest,
+    },
+};
+#[cfg(not(target_os = "macos"))]
+use xguard_wireguard_rs::Kernel;
+#[cfg(target_os = "macos")]
+use xguard_wireguard_rs::Userspace;
+use xguard_wireguard_rs::{
+    error::WireguardInterfaceError, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
+};
 
 #[cfg(windows)]
 use crate::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
+#[cfg(any(windows, target_os = "linux"))]
+use crate::service_locations::{
+    run_reconciler,
+    store::{validate_instance_id, Store, StoreError, StoredInstance},
+    wake_reconciler, ServiceLocationManager,
+};
 use crate::{config::Config, VERSION};
 
-const SERVICE_LOCATIONS_UNSUPPORTED: &str = "Service locations are not supported by XGuard";
+/// Starts the service-location reconciler; returns the manager the RPCs use.
+#[cfg(any(windows, target_os = "linux"))]
+fn start_service_locations() -> (
+    Arc<tokio::sync::Mutex<ServiceLocationManager>>,
+    JoinHandle<()>,
+) {
+    let store = Store::new(Store::default_dir());
+    info!(
+        "Service locations are stored in {}",
+        Store::default_dir().display()
+    );
+    let manager = Arc::new(tokio::sync::Mutex::new(ServiceLocationManager::new(store)));
+    let handle = tokio::spawn(run_reconciler(Arc::clone(&manager)));
+    (manager, handle)
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
+const SERVICE_LOCATIONS_UNSUPPORTED: &str = "Service locations are not supported on this system";
 
 #[cfg(unix)]
 pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/xguard.socket";
@@ -77,9 +98,9 @@ pub enum DaemonError {
 
 type IfName = String;
 #[cfg(not(target_os = "macos"))]
-type WG = WGApi<Kernel>;
+pub(crate) type WG = WGApi<Kernel>;
 #[cfg(target_os = "macos")]
-type WG = WGApi<Userspace>;
+pub(crate) type WG = WGApi<Userspace>;
 
 #[derive(Default)]
 pub(crate) struct DaemonService {
@@ -87,6 +108,9 @@ pub(crate) struct DaemonService {
     wgapis: Arc<RwLock<HashMap<IfName, WG>>>,
     stats_period: Duration,
     stat_tasks: Arc<Mutex<HashMap<IfName, JoinHandle<()>>>>,
+    /// Service-location tunnels, kept apart from the app's tunnels.
+    #[cfg(any(windows, target_os = "linux"))]
+    service_locations: Option<Arc<tokio::sync::Mutex<ServiceLocationManager>>>,
 }
 
 impl DaemonService {
@@ -96,7 +120,19 @@ impl DaemonService {
             wgapis: Arc::new(RwLock::new(HashMap::new())),
             stats_period: Duration::from_secs(config.stats_period),
             stat_tasks: Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(any(windows, target_os = "linux"))]
+            service_locations: None,
         }
+    }
+
+    #[cfg(any(windows, target_os = "linux"))]
+    #[must_use]
+    pub(crate) fn with_service_locations(
+        mut self,
+        manager: Arc<tokio::sync::Mutex<ServiceLocationManager>>,
+    ) -> Self {
+        self.service_locations = Some(manager);
+        self
     }
 }
 
@@ -139,12 +175,23 @@ fn configure_new_interface(
     wgapi: &mut WG,
     interface_config: &mut InterfaceConfiguration,
 ) -> Result<(), Status> {
+    configure_interface(ifname, &request.dns, wgapi, interface_config)
+}
+
+/// Configures a freshly created interface: addresses, peers, routing and DNS. Shared by
+/// app-requested tunnels and service locations.
+pub(crate) fn configure_interface(
+    ifname: &str,
+    dns: &Option<String>,
+    wgapi: &mut WG,
+    interface_config: &mut InterfaceConfiguration,
+) -> Result<(), Status> {
     normalize_allowed_ips(interface_config);
 
     // The WireGuard DNS config value can be a list of IP addresses and domain names, which will
     // be used as DNS servers and search domains respectively.
     debug!("Preparing DNS configuration for interface {ifname}");
-    let (dns, search_domains) = dns_borrow(&request.dns);
+    let (dns, search_domains) = dns_borrow(dns);
     debug!(
         "DNS configuration for interface {ifname}: DNS: {dns:?}, Search domains: \
         {search_domains:?}"
@@ -206,22 +253,76 @@ pub(crate) fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
 impl DesktopDaemonService for DaemonService {
     type ReadInterfaceDataStream = InterfaceDataStream;
 
-    // Service locations (always-on tunnels managed by the daemon) are not part of XGuard yet.
-    // The RPCs stay in the protocol so older apps get a clear error instead of a transport failure.
+    #[cfg(any(windows, target_os = "linux"))]
+    async fn save_service_locations(
+        &self,
+        request: tonic::Request<SaveServiceLocationsRequest>,
+    ) -> Result<Response<()>, Status> {
+        let request = request.into_inner();
+        let instance = StoredInstance::from_request(&request).map_err(|err| {
+            warn!("Refused service locations from the app: {err}");
+            Status::invalid_argument(err.to_string())
+        })?;
+        let Some(manager) = &self.service_locations else {
+            return Err(Status::unavailable("service locations are not running"));
+        };
+        let changed = manager.lock().await.save(&instance).map_err(|err| {
+            error!("Failed to store service locations: {err}");
+            match err {
+                StoreError::Io(_) => Status::internal("failed to store service locations"),
+                other => Status::invalid_argument(other.to_string()),
+            }
+        })?;
+        if changed {
+            info!(
+                "Stored {} service location(s) for instance {}",
+                instance.locations.len(),
+                instance.instance_id
+            );
+            wake_reconciler();
+        }
+        Ok(Response::new(()))
+    }
+
+    #[cfg(any(windows, target_os = "linux"))]
+    async fn delete_service_locations(
+        &self,
+        request: tonic::Request<DeleteServiceLocationsRequest>,
+    ) -> Result<Response<()>, Status> {
+        let instance_id = validate_instance_id(&request.into_inner().instance_id)
+            .map_err(|err| Status::invalid_argument(err.to_string()))?;
+        let Some(manager) = &self.service_locations else {
+            return Ok(Response::new(()));
+        };
+        let removed = manager
+            .lock()
+            .await
+            .store()
+            .delete(&instance_id)
+            .map_err(|err| {
+                error!("Failed to delete service locations: {err}");
+                Status::internal("failed to delete service locations")
+            })?;
+        if removed {
+            info!("Removed the service locations of instance {instance_id}");
+            wake_reconciler();
+        }
+        Ok(Response::new(()))
+    }
+
+    #[cfg(not(any(windows, target_os = "linux")))]
     async fn save_service_locations(
         &self,
         _request: tonic::Request<SaveServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
-        warn!("Rejected a save_service_locations request: service locations are not supported");
         Err(Status::unimplemented(SERVICE_LOCATIONS_UNSUPPORTED))
     }
 
+    #[cfg(not(any(windows, target_os = "linux")))]
     async fn delete_service_locations(
         &self,
         _request: tonic::Request<DeleteServiceLocationsRequest>,
     ) -> Result<Response<()>, Status> {
-        // Nothing is ever stored, so there is nothing to delete.
-        debug!("Ignoring a delete_service_locations request: service locations are not supported");
         Ok(Response::new(()))
     }
 
@@ -537,8 +638,14 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
         fs::set_permissions(DAEMON_SOCKET_PATH, fs::Permissions::from_mode(0o660))?;
     }
 
+    #[cfg(target_os = "linux")]
+    let (service_locations, reconciler) = start_service_locations();
+    #[cfg(target_os = "linux")]
+    let daemon_service = Arc::new(
+        DaemonService::new(&config).with_service_locations(Arc::clone(&service_locations)),
+    );
+    #[cfg(not(target_os = "linux"))]
     let daemon_service = Arc::new(DaemonService::new(&config));
-
 
     let uds_stream = UnixListenerStream::new(uds);
 
@@ -576,7 +683,6 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
             result = &mut server => ShutdownReason::Server(result),
         };
 
-
         // close statistics streams so they do not hold up graceful server shutdown
         daemon_service.stop_stat_tasks();
         let result = match reason {
@@ -587,6 +693,9 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
             }
         };
         daemon_service.remove_interfaces();
+        reconciler.abort();
+        let _ = reconciler.await;
+        service_locations.lock().await.shut_down();
 
         result?;
     }
@@ -602,7 +711,10 @@ pub(crate) async fn run_server(config: Config) -> anyhow::Result<()> {
     debug!("Starting XGuard interface management daemon");
 
     let stream = get_named_pipe_server_stream();
-    let daemon_service = DaemonService::new(&config);
+    // Service locations run for the life of the service; Windows removes the tunnels when the
+    // process ends.
+    let (service_locations, _reconciler) = start_service_locations();
+    let daemon_service = DaemonService::new(&config).with_service_locations(service_locations);
 
     info!("XGuard daemon version {VERSION} started, listening on named pipe {PIPE_NAME}");
     debug!("XGuard daemon configuration: {config:?}");

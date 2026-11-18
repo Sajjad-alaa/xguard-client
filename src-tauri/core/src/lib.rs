@@ -13,12 +13,13 @@ use database::models::{
     },
     Id,
 };
-use xguard_client_proto::xguard::client_types::DeviceConfig;
-use xguard_wireguard_rs::net::IpAddrMask;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Json;
+use xguard_client_proto::xguard::client_types::DeviceConfig;
+use xguard_wireguard_rs::net::IpAddrMask;
 
 pub mod app_config;
+pub mod config_sync;
 pub mod connection;
 pub mod connection_ability;
 pub mod database;
@@ -30,7 +31,9 @@ pub mod mfa;
 pub mod mfa_config;
 pub mod mfa_contract;
 pub mod posture;
+pub mod provisioning;
 pub mod proxy;
+pub mod service_locations;
 #[cfg(test)]
 mod test_helpers;
 pub mod version;

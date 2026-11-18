@@ -119,6 +119,9 @@ const setAutostartEnabled = (enabled: boolean): Promise<void> =>
 const getProvisioningConfig = (): Promise<ProvisioningConfig | null> =>
   invoke(TauriCommand.GetProvisioningConfig);
 
+/** Polls every instance's configuration from XGuard now (config sync). */
+const syncInstancesNow = (): Promise<void> => invoke(TauriCommand.SyncInstancesNow);
+
 const takePendingAddInstance = (): Promise<AddInstanceEventPayload | null> =>
   invoke(TauriCommand.TakePendingAddInstance);
 
@@ -347,6 +350,7 @@ export const api = {
   deleteInstance,
   updateInstance,
   saveDeviceConfig,
+  syncInstancesNow,
   // Locations
   getLocations,
   hasAnyVisibleLocations,
