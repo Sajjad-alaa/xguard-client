@@ -207,3 +207,75 @@ async fn test_missing_instance_info_is_an_error(pool: SqlitePool) {
 
     assert!(matches!(result, Err(Error::ResourceNotFound(_))));
 }
+
+/// A refresh carries the administrator's client settings: the traffic policy, the tunnel switch
+/// and the (group) client MTU. The user's routing preference is kept, but the policy decides
+/// what is routed and the server MTU caps the local one.
+#[sqlx::test(migrations = "../migrations")]
+async fn test_refresh_applies_client_settings(pool: SqlitePool) {
+    use crate::{
+        database::models::instance::ClientTrafficPolicy,
+        proto::client_types::ClientTrafficPolicy as WirePolicy,
+    };
+
+    let mut instance = setup(&pool, vec![config(1, "hq", "hq:51820")]).await;
+    let mut location = locations(&pool, &instance).await.remove(0);
+    location.route_all_traffic = true;
+    location.save(&pool).await.unwrap();
+    assert!(!Instance::tunnels_disabled(&pool).await.unwrap());
+
+    let mut refreshed = response("office", vec![config(1, "hq", "hq:51820")], None);
+    let info = refreshed.instance.as_mut().unwrap();
+    info.client_traffic_policy = Some(WirePolicy::DisableAllTraffic as i32);
+    info.disable_tunnels = Some(true);
+    refreshed.configs[0].mtu = Some(1280);
+    let summary = apply(&pool, &mut instance, refreshed).await.unwrap();
+    assert!(summary.instance_changed);
+
+    let stored = Instance::find_by_id(&pool, instance.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        stored.client_traffic_policy,
+        ClientTrafficPolicy::DisableAllTraffic
+    );
+    assert!(Instance::tunnels_disabled(&pool).await.unwrap());
+
+    let location = locations(&pool, &instance).await.remove(0);
+    assert!(location.route_all_traffic, "the preference is kept");
+    assert!(
+        !location
+            .effective_route_all_traffic(&pool, None)
+            .await
+            .unwrap(),
+        "but the policy decides"
+    );
+    assert!(
+        !location
+            .effective_route_all_traffic(&pool, Some(true))
+            .await
+            .unwrap(),
+        "also against an explicit request"
+    );
+    assert_eq!(location.client_mtu, Some(1280));
+    assert_eq!(location.effective_mtu(Some(1420)), Some(1280));
+    assert!(
+        Location::update_routing(&pool, location.id, true)
+            .await
+            .is_err(),
+        "routing all traffic cannot be switched on"
+    );
+
+    // Forcing all traffic works the other way round.
+    let mut refreshed = response("office", vec![config(1, "hq", "hq:51820")], None);
+    refreshed.instance.as_mut().unwrap().client_traffic_policy =
+        Some(WirePolicy::ForceAllTraffic as i32);
+    apply(&pool, &mut instance, refreshed).await.unwrap();
+    let location = locations(&pool, &instance).await.remove(0);
+    assert!(location
+        .effective_route_all_traffic(&pool, Some(false))
+        .await
+        .unwrap());
+    assert!(!Instance::tunnels_disabled(&pool).await.unwrap());
+}

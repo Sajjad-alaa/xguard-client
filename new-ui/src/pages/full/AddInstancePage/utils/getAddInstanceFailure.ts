@@ -28,6 +28,12 @@ export const getAddInstanceFailure = (
         : { kind: 'field', field: 'token', message: 'Invalid token.' };
     case 'name_taken':
       return { kind: 'field', field: 'name', message: 'Name already used.' };
+    case 'admin_managed':
+      return {
+        kind: 'snackbar',
+        message:
+          'Only administrators can add devices on this instance. Ask your administrator for a device activation token.',
+      };
     default:
       return { kind: 'snackbar', message: 'Communication error, contact administrator.' };
   }

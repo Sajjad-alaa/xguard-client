@@ -1,9 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
 import { Fragment } from 'react/jsx-runtime';
 import { api } from '../../../../rust-api/api';
-import { ClientTrafficPolicy } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
 import { shouldStartMfa } from '../../../../utils/mfa';
+import { canChooseRouting, lockedRoutingLabel } from '../../../../utils/trafficPolicy';
 import { Divider } from '../../../Divider/Divider';
 import { SizedBox } from '../../../SizedBox/SizedBox';
 import { Toggle } from '../../../Toggle/Toggle';
@@ -24,7 +24,15 @@ export const DefaultView = () => {
 
   return (
     <div className="location-view-default">
-      {(instance?.client_traffic_policy === ClientTrafficPolicy.None || !instance) && (
+      {!canChooseRouting(instance?.client_traffic_policy) && (
+        <Fragment>
+          <Divider spacing={ThemeSpacing.Md} />
+          <p className="locked-routing">
+            {lockedRoutingLabel(instance?.client_traffic_policy)}
+          </p>
+        </Fragment>
+      )}
+      {canChooseRouting(instance?.client_traffic_policy) && (
         <Fragment>
           <Divider spacing={ThemeSpacing.Md} />
           <Toggle

@@ -18,6 +18,7 @@ import { ThemeSpacing } from '../../types';
 import { connectConfigureFactorsSource } from '../../utils/configureFactorsSource';
 import { isPresent } from '../../utils/isPresent';
 import { ConnectionAbility, resolveMfaStepPlan, shouldStartMfa } from '../../utils/mfa';
+import { canChooseRouting, lockedRoutingLabel } from '../../utils/trafficPolicy';
 import { Divider } from '../Divider/Divider';
 import { IconKind } from '../Icon';
 import {
@@ -169,7 +170,12 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
         )}
         {!location.active && (
           <Fragment>
-            {(instance?.client_traffic_policy === 'none' || !instance) && (
+            {!canChooseRouting(instance?.client_traffic_policy) && (
+              <p className="locked-routing">
+                {lockedRoutingLabel(instance?.client_traffic_policy)}
+              </p>
+            )}
+            {canChooseRouting(instance?.client_traffic_policy) && (
               <Toggle
                 disabled={location.active}
                 active={location.route_all_traffic}

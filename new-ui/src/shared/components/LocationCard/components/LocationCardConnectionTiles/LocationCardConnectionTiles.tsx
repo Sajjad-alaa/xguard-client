@@ -2,13 +2,10 @@ import './style.scss';
 import clsx from 'clsx';
 import { useMemo } from 'react';
 import { useAppData } from '../../../../providers/AppDataContext';
-import {
-  ClientTrafficPolicy,
-  type InstanceInfo,
-  type LocationInfo,
-} from '../../../../rust-api/types';
+import type { InstanceInfo, LocationInfo } from '../../../../rust-api/types';
 import { isPresent } from '../../../../utils/isPresent';
 import { mfaStepsOf, mfaStepsToText, mfaToText } from '../../../../utils/mfa';
+import { effectiveRouteAllTraffic } from '../../../../utils/trafficPolicy';
 import { BoxIcon } from '../../../BoxIcon/BoxIcon';
 import { Icon, IconKind } from '../../../Icon';
 
@@ -21,9 +18,10 @@ interface Props {
 export const LocationCardConnectionTiles = ({ location, instance, variant }: Props) => {
   const { connectionMfaMethod } = useAppData();
 
-  const routeAllTraffic =
-    location.route_all_traffic ||
-    instance?.client_traffic_policy === ClientTrafficPolicy.ForceAllTraffic;
+  const routeAllTraffic = effectiveRouteAllTraffic(
+    instance?.client_traffic_policy,
+    location.route_all_traffic,
+  );
 
   const mfaLabel = useMemo(() => {
     const steps = mfaStepsOf(location);

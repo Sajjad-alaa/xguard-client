@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { getAddInstanceFailure } from './getAddInstanceFailure';
 
 describe('getAddInstanceFailure', () => {
+  it('explains that devices are managed by administrators', () => {
+    for (const hidden of [true, false]) {
+      const failure = getAddInstanceFailure({ errorKind: 'admin_managed' }, hidden);
+      expect(failure.kind).toBe('snackbar');
+      expect(failure.message).toContain('administrator');
+    }
+  });
+
   it('marks the URL field when the instance is unreachable on manual entry', () => {
     expect(getAddInstanceFailure({ errorKind: 'network' }, false)).toEqual({
       kind: 'field',

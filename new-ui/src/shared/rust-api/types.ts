@@ -629,7 +629,8 @@ export type EnrollmentErrorKind = 'network' | 'unauthorized' | 'server';
 
 export type AddInstanceRequest = { url: string; token: string; name: string };
 
-export type AddInstanceErrorKind = EnrollmentErrorKind | 'name_taken';
+// `admin_managed`: only administrators may add devices on this instance (for this token).
+export type AddInstanceErrorKind = EnrollmentErrorKind | 'name_taken' | 'admin_managed';
 
 export type AddInstanceResult = {
   startResponse?: EnrollmentStartResult;

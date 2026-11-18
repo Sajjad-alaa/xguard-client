@@ -111,6 +111,11 @@ export const enrollmentAddInstance = async (
       }
     }
 
+    // The server refuses to create a device for this token; say why before trying.
+    if (startResult.settings.admin_device_management) {
+      return { errorKind: 'admin_managed' };
+    }
+
     const normalizedName = values.name.trim().toLowerCase();
     if (
       startResult.user.device_names.some((n) => n.trim().toLowerCase() === normalizedName)
