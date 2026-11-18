@@ -3,16 +3,16 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use xguard_client_core::{
-    connection::active_connections::ACTIVE_CONNECTIONS, enrollment::EnrollmentSession,
-    mfa::MfaAuthSession, mfa_config::MfaConfigSession,
-};
 use tauri::{
     async_runtime::{spawn, JoinHandle},
     PhysicalPosition,
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+use xguard_client_core::{
+    connection::active_connections::ACTIVE_CONNECTIONS, enrollment::EnrollmentSession,
+    mfa::MfaAuthSession, mfa_config::MfaConfigSession, provisioning::FoundProvisioning,
+};
 
 use crate::{
     app_config::AppConfig,
@@ -44,9 +44,22 @@ pub struct AppState {
     stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
     pub pending_add_instance: Mutex<Option<AddInstancePayload>>,
     pub session_state: Mutex<SessionState>,
+    /// Provisioning file found at start-up, offered until an instance is saved.
+    pub provisioning: Mutex<Option<FoundProvisioning>>,
+    /// Instance UUID an enrollment with the provisioning token started for.
+    pub provisioning_instance_uuid: Mutex<Option<String>>,
 }
 
 impl AppState {
+    #[must_use]
+    pub fn with_provisioning(self, provisioning: Option<FoundProvisioning>) -> Self {
+        *self
+            .provisioning
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = provisioning;
+        self
+    }
+
     #[must_use]
     pub fn new(config: AppConfig) -> Self {
         Self {
@@ -61,6 +74,8 @@ impl AppState {
             stat_threads: Mutex::new(HashMap::new()),
             pending_add_instance: Mutex::new(None),
             session_state: Mutex::new(SessionState::default()),
+            provisioning: Mutex::new(None),
+            provisioning_instance_uuid: Mutex::new(None),
         }
     }
 

@@ -2,9 +2,16 @@ use core::fmt;
 use std::{collections::HashMap, env, future::Future, str::FromStr, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
+use reqwest::Url;
+use serde::{Deserialize, Serialize};
+use struct_patch::Patch;
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
+use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 #[cfg(not(target_os = "macos"))]
 use xguard_client_core::connection::daemon_client::DAEMON_CLIENT;
 use xguard_client_core::{
+    config_sync::forget_revision,
     connection::{
         active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
         disconnect_interface, ConflictingConnection, ConnectionTarget,
@@ -14,6 +21,8 @@ use xguard_client_core::{
     mfa::{self, MfaAuthSession},
     mfa_config::{self, AuthorizeProof, MfaConfigError, MfaConfigSession, SetupProof},
     mfa_contract::MfaContract,
+    provisioning::{mark_consumed, ProvisioningConfig},
+    service_locations::{remove_service_locations, sync_service_locations},
 };
 #[cfg(not(target_os = "macos"))]
 use xguard_client_proto::xguard::client::v1::RemoveInterfaceRequest;
@@ -22,15 +31,11 @@ use xguard_client_proto::xguard::client_types::{
     DeviceConfigResponse, EnrollmentSettings, InitialUserInfo, InstanceInfo as ProtoInstanceInfo,
     MfaConfigAuthorizeResponse, MfaFido2Assertion, MfaMethod,
 };
-use reqwest::Url;
-use serde::{Deserialize, Serialize};
-use struct_patch::Patch;
-use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
-use tokio_util::sync::CancellationToken;
-use uuid::Uuid;
 
 const UPDATE_URL: &str = "https://pkgs.xguard.local/api/update/check";
 
+#[cfg(not(target_os = "macos"))]
+use crate::utils::execute_command;
 use crate::{
     app_config::{AppConfig, AppConfigPatch},
     appstate::{AppState, Ceremony},
@@ -49,13 +54,13 @@ use crate::{
     error::Error,
     events::{AddInstancePayload, EventKey, TunnelsDisabledPayload, TunnelsEnabledPayload},
     fido2_window::{platform_context, WindowLevelGuard},
-    security_key::{self, pin_policy, Assertion, Fido2Error, PinPolicy, PlatformContext},
     into_location,
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
     proxy::construct_platform_header,
+    security_key::{self, pin_policy, Assertion, Fido2Error, PinPolicy, PlatformContext},
     tauri_err_to_app_err,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
@@ -65,8 +70,6 @@ use crate::{
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
-#[cfg(not(target_os = "macos"))]
-use crate::utils::execute_command;
 
 #[derive(Debug, Serialize, thiserror::Error)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -477,13 +480,11 @@ pub async fn disconnect_locations(location_ids: Vec<Id>, handle: AppHandle) -> R
     Ok(())
 }
 
-
-/// Asks the frontend to refetch the instance after its MFA state may have changed.
-///
-/// The server-side state is not re-fetched here: that needs instance configuration sync, which
-/// XGuard does not provide yet. The next enrollment or manual update brings it in.
+/// Asks the frontend to refetch the instance after its MFA state may have changed, and the
+/// configuration sync to fetch the server's view now.
 async fn refresh_instance_config(instance_id: Id, handle: &AppHandle) -> Result<(), Error> {
-    debug!("Refreshing the frontend view of instance {instance_id}");
+    debug!("Refreshing instance {instance_id}");
+    crate::periodic::config::request_config_sync();
     handle
         .emit(EventKey::InstanceUpdate.into(), ())
         .map_err(tauri_err_to_app_err)
@@ -494,7 +495,6 @@ pub struct SaveDeviceConfigResponse {
     locations: Vec<Location<Id>>,
     instance: Instance<Id>,
 }
-
 
 #[tauri::command(async)]
 pub async fn save_device_config(
@@ -556,6 +556,7 @@ pub async fn save_device_config(
 
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
+    clear_provisioning_after_save(&handle, &instance.uuid);
 
     if Instance::tunnels_disabled(&*DB_POOL).await? {
         disconnect_all_tunnels(&handle).await?;
@@ -575,12 +576,41 @@ pub async fn save_device_config(
     Ok(res)
 }
 
-/// Returns all of the instance's locations.
+/// Hands the instance's service locations to the background service (best effort: the
+/// configuration sync retries) and returns all of the instance's locations.
 async fn push_service_locations(instance: &Instance<Id>) -> Result<Vec<Location<Id>>, Error> {
     let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, true).await?;
     trace!("Created following locations: {locations:#?}");
+    if let Err(err) = sync_service_locations(&DB_POOL, instance).await {
+        warn!("Failed to hand service locations of {instance} to the background service: {err}");
+    }
 
     Ok(locations)
+}
+
+/// Once any instance is saved the provisioning file is no longer offered. When the saved
+/// instance was enrolled with its token, the token is recorded as used and a user-scoped file is
+/// deleted. Errors are logged: the instance is already committed.
+fn clear_provisioning_after_save(handle: &AppHandle, saved_instance_uuid: &str) {
+    let app_state = handle.state::<AppState>();
+    let found = app_state
+        .provisioning
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take();
+    let used_for = app_state
+        .provisioning_instance_uuid
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take();
+    if let Some(found) = found {
+        if used_for.as_deref() == Some(saved_instance_uuid) {
+            match handle.path().app_data_dir() {
+                Ok(dir) => mark_consumed(&dir, &found),
+                Err(err) => warn!("Failed to resolve the app data directory: {err}"),
+            }
+        }
+    }
 }
 
 /// `connected_location_ids` is read once by the caller, so a listing does not take the
@@ -802,6 +832,14 @@ pub async fn update_instance(
         let summary = apply_device_config(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
         debug!("Updated instance {instance}: {summary:?}");
+        // The next poll fetches the full configuration again rather than trusting a revision
+        // from before this refresh.
+        forget_revision(instance.id);
+        if let Err(err) = sync_service_locations(&DB_POOL, &instance).await {
+            warn!(
+                "Failed to hand service locations of {instance} to the background service: {err}"
+            );
+        }
 
         // The administrator may have switched bare tunnels off or on since the last refresh.
         let tunnels_disabled = Instance::tunnels_disabled(&*DB_POOL).await?;
@@ -1039,6 +1077,12 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
     instance.delete(&mut *transaction).await?;
 
     transaction.commit().await?;
+    forget_revision(instance.id);
+    if let Err(err) = remove_service_locations(&instance.uuid).await {
+        warn!(
+            "Failed to remove service locations of {instance} from the background service: {err}"
+        );
+    }
 
     if was_disabled && !Instance::tunnels_disabled(&*DB_POOL).await? {
         TunnelsEnabledPayload::emit(&handle);
@@ -1108,6 +1152,12 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
     instance.delete(&mut *transaction).await?;
 
     transaction.commit().await?;
+    forget_revision(instance.id);
+    if let Err(err) = remove_service_locations(&instance.uuid).await {
+        warn!(
+            "Failed to remove service locations of {instance} from the background service: {err}"
+        );
+    }
 
     if was_disabled && !Instance::tunnels_disabled(&*DB_POOL).await? {
         TunnelsEnabledPayload::emit(&handle);
@@ -1423,11 +1473,23 @@ pub async fn command_set_app_config(
     Ok(res)
 }
 
-/// Provisioning files (pre-seeded enrollment) are not supported yet, so there is never one.
+/// The provisioning file found at start-up, if no instance has been saved since.
 #[tauri::command]
 #[must_use]
-pub fn get_provisioning_config() -> Option<()> {
-    None
+pub fn get_provisioning_config(app_state: State<'_, AppState>) -> Option<ProvisioningConfig> {
+    app_state
+        .provisioning
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .map(|found| found.config.clone())
+}
+
+/// Polls every instance's configuration now (the "refresh" action).
+#[tauri::command]
+pub fn sync_instances_now() {
+    debug!("Configuration sync requested from the UI");
+    crate::periodic::config::request_config_sync();
 }
 
 #[tauri::command]
@@ -1509,6 +1571,12 @@ pub async fn enrollment_start(
     state: State<'_, AppState>,
 ) -> Result<EnrollmentStartResult, String> {
     debug!("Starting enrollment at {proxy_url}");
+    let uses_provisioning_token = state
+        .provisioning
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .is_some_and(|found| found.config.enrollment_token == token);
     let url = Url::parse(&proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
     let (session, response) = enrollment::enrollment_start(url, token)
         .await
@@ -1525,6 +1593,15 @@ pub async fn enrollment_start(
         .as_ref()
         .map_or("<unknown>", |u| u.login.as_str());
     info!("Enrollment started for user {login}, session {session_id}");
+    if uses_provisioning_token {
+        *state
+            .provisioning_instance_uuid
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = response
+            .instance
+            .as_ref()
+            .map(|instance| instance.id.clone());
+    }
     let user = response
         .user
         .ok_or_else(|| "Proxy did not return user info".to_string())?;

@@ -11,6 +11,7 @@ pub mod fido2_window;
 pub mod gui;
 pub mod log_watcher;
 pub mod periodic;
+pub mod provisioning;
 pub mod security_key;
 pub mod session_state;
 #[cfg(all(target_os = "macos", feature = "macos_installer"))]

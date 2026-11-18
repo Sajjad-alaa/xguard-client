@@ -11,15 +11,6 @@ use std::{
 
 use clap::{builder::FalseyValueParser, command, value_parser, Arg, Command};
 use common::{dns_borrow, find_free_tcp_port, get_interface_name};
-use xguard_client_proto::conversions::normalize_allowed_ips;
-#[cfg(not(target_os = "macos"))]
-use xguard_wireguard_rs::Kernel;
-#[cfg(target_os = "macos")]
-use xguard_wireguard_rs::Userspace;
-use xguard_wireguard_rs::{
-    error::WireguardInterfaceError, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
-    WGApi, WireguardInterfaceApi,
-};
 use proto::xguard::client_types::{
     Device, DeviceConfig, DeviceConfigResponse, EnrollmentStartRequest, EnrollmentStartResponse,
     InstanceInfo, InstanceInfoRequest, InstanceInfoResponse, NewDevice,
@@ -34,6 +25,15 @@ use tokio::time::sleep;
 use tokio::{select, signal::ctrl_c, sync::Notify, time::interval};
 use tracing::{debug, error, info, level_filters::LevelFilter, trace, warn};
 use tracing_subscriber::EnvFilter;
+use xguard_client_proto::conversions::normalize_allowed_ips;
+#[cfg(not(target_os = "macos"))]
+use xguard_wireguard_rs::Kernel;
+#[cfg(target_os = "macos")]
+use xguard_wireguard_rs::Userspace;
+use xguard_wireguard_rs::{
+    error::WireguardInterfaceError, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
+    WGApi, WireguardInterfaceApi,
+};
 
 mod proto {
     pub mod xguard {
@@ -383,17 +383,28 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
 const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Fetch configuration from XGuard proxy.
-async fn fetch_config(client: &Client, url: Url, token: String) -> Result<DeviceConfig, CliError> {
+/// Fetch configuration from XGuard proxy. Returns `None` when it is unchanged since `revision`,
+/// which is updated from the response.
+async fn fetch_config(
+    client: &Client,
+    url: Url,
+    token: String,
+    revision: &mut Option<String>,
+) -> Result<Option<DeviceConfig>, CliError> {
     let result = client
         .post(url.clone())
-        .json(&InstanceInfoRequest { token })
+        .json(&InstanceInfoRequest {
+            token,
+            config_revision: revision.clone(),
+        })
         .timeout(HTTP_REQ_TIMEOUT)
         .send()
         .await?;
 
     let instance_response: InstanceInfoResponse = if result.status() == StatusCode::OK {
         result.json().await?
+    } else if result.status() == StatusCode::TOO_MANY_REQUESTS {
+        return Err(CliError::XGuardApi("polling too often".into()));
     } else if matches!(
         result.status(),
         StatusCode::PAYMENT_REQUIRED | StatusCode::PRECONDITION_REQUIRED
@@ -408,6 +419,11 @@ async fn fetch_config(client: &Client, url: Url, token: String) -> Result<Device
         )));
     };
 
+    if instance_response.not_modified == Some(true) {
+        *revision = instance_response.config_revision;
+        return Ok(None);
+    }
+    let new_revision = instance_response.config_revision.clone();
     let Some(response) = instance_response.device_config else {
         return Err(CliError::XGuardApi(
             "Missing `DeviceConfigResponse` in the configuration polling response.".into(),
@@ -431,8 +447,9 @@ async fn fetch_config(client: &Client, url: Url, token: String) -> Result<Device
         // This should not happen.
         return Err(CliError::MissingData);
     };
+    *revision = new_revision;
 
-    Ok(device_config)
+    Ok(Some(device_config))
 }
 
 /// Poll configuration from XGuard proxy in regular intervals.
@@ -447,7 +464,12 @@ async fn poll_config(config: &mut CliConfig) {
         );
         return;
     };
-    let client = match Client::builder().cookie_store(true).build() {
+    // Never follow redirects: the polling token must not travel to another host.
+    let client = match Client::builder()
+        .cookie_store(true)
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+    {
         Ok(client) => client,
         Err(err) => {
             error!("Failed to create a new HTTP client for config polling: {err}");
@@ -467,11 +489,13 @@ async fn poll_config(config: &mut CliConfig) {
     url.set_path("/api/v1/poll");
     debug!("Config polling setup done, starting the polling loop.");
     let mut interval = interval(INTERVAL_SECONDS);
+    let mut revision = None;
     loop {
         interval.tick().await;
         debug!("Polling network configuration from proxy.");
-        match fetch_config(&client, url.clone(), token.clone()).await {
-            Ok(device_config) => {
+        match fetch_config(&client, url.clone(), token.clone(), &mut revision).await {
+            Ok(None) => debug!("Network configuration has not changed. Continuing."),
+            Ok(Some(device_config)) => {
                 if config.device_config != device_config {
                     debug!("Network configuration has changed, re-configuring.");
                     trace!(

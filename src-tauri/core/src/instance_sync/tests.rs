@@ -99,6 +99,8 @@ async fn test_adds_updates_and_removes_locations(pool: SqlitePool) {
         vec![config(1, "hq", "hq:51820"), config(2, "lab", "lab:51820")],
     )
     .await;
+    let before = locations(&pool, &instance).await;
+    let (hq_id, removed_id) = (before[0].id, before[1].id);
 
     let summary = apply(
         &pool,
@@ -118,7 +120,10 @@ async fn test_adds_updates_and_removes_locations(pool: SqlitePool) {
             instance_changed: false,
             added: 1,
             updated: 1,
-            removed: 1
+            removed: 1,
+            removed_ids: vec![removed_id],
+            tunnel_changed_ids: vec![hq_id],
+            traffic_policy_changed: false,
         }
     );
     let stored = locations(&pool, &instance).await;
@@ -278,4 +283,50 @@ async fn test_refresh_applies_client_settings(pool: SqlitePool) {
         .await
         .unwrap());
     assert!(!Instance::tunnels_disabled(&pool).await.unwrap());
+}
+
+#[sqlx::test(migrations = "../migrations")]
+async fn test_rename_is_not_a_tunnel_change(pool: SqlitePool) {
+    let mut instance = setup(&pool, vec![config(1, "hq", "hq:51820")]).await;
+
+    let summary = apply(
+        &pool,
+        &mut instance,
+        response("office", vec![config(1, "hq-renamed", "hq:51820")], None),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(summary.updated, 1);
+    assert!(summary.tunnel_changed_ids.is_empty());
+    assert!(!summary.traffic_policy_changed);
+}
+
+#[sqlx::test(migrations = "../migrations")]
+async fn test_tunnel_relevant_changes_and_policy(pool: SqlitePool) {
+    let mut instance = setup(
+        &pool,
+        vec![config(1, "hq", "hq:51820"), config(2, "lab", "lab:51820")],
+    )
+    .await;
+    let ids: Vec<_> = locations(&pool, &instance)
+        .await
+        .iter()
+        .map(|l| l.id)
+        .collect();
+
+    let mut mtu = config(1, "hq", "hq:51820");
+    mtu.mtu = Some(1300);
+    let mut service = config(2, "lab", "lab:51820");
+    service.service_location_mode =
+        Some(crate::proto::client_types::ServiceLocationMode::Alwayson as i32);
+    let mut changed = response("office", vec![mtu, service], None);
+    changed.instance.as_mut().unwrap().client_traffic_policy =
+        Some(crate::proto::client_types::ClientTrafficPolicy::ForceAllTraffic as i32);
+
+    let summary = apply(&pool, &mut instance, changed).await.unwrap();
+
+    assert_eq!(summary.tunnel_changed_ids, ids);
+    assert!(summary.traffic_policy_changed);
+    assert!(summary.instance_changed);
 }
