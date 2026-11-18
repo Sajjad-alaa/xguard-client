@@ -30,7 +30,7 @@ sqlx.workspace = true
 strum.workspace = true
 struct-patch = "0.12"
 thiserror.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["io-util", "process"] }
 tokio-tungstenite.workspace = true
 tokio-util.workspace = true
 tonic.workspace = true

@@ -191,13 +191,11 @@ pub async fn handle(
                     state.app_config.mtu(),
                 )
             } else if location.posture_check_required {
-                // Only a pre-fork server can ask for this; connecting without the check would be
-                // refused by it anyway, so fail early with a clear reason.
-                return Err(CliError::Other(format!(
-                    "Location '{}' requires a device posture check, which XGuard does not \
-                     support.",
-                    location.name
-                )));
+                // Posture only (no MFA): report the device posture to get a session key.
+                let psk = xguard_core::posture::authorize_location(&state.pool, location)
+                    .await
+                    .map_err(mfa::into_cli)?;
+                (location.name.clone(), psk, state.app_config.mtu())
             } else {
                 (location.name.clone(), None, state.app_config.mtu())
             }

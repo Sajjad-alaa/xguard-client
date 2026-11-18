@@ -68,10 +68,6 @@ use crate::{
 #[cfg(not(target_os = "macos"))]
 use crate::utils::execute_command;
 
-/// Reported wherever a server asks for a device posture check, which XGuard does not perform.
-const POSTURE_UNSUPPORTED: &str = "This location requires a device posture check, which XGuard \
-    does not support yet";
-
 #[derive(Debug, Serialize, thiserror::Error)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ConnectError {
@@ -219,6 +215,7 @@ fn mfa_error_is_terminal(error: &mfa::MfaError) -> bool {
         mfa::MfaError::Cancelled
         | mfa::MfaError::AttemptLimit { .. }
         | mfa::MfaError::MfaRejected { .. }
+        | mfa::MfaError::PostureRejected { .. }
         | mfa::MfaError::MobileClientOutdated
         | mfa::MfaError::Other { .. } => true,
         mfa::MfaError::NetworkError { .. }
@@ -277,11 +274,21 @@ pub async fn connect(
                 .into());
             }
             // Connect-time MFA brings the tunnel up itself (keeping the preshared
-            // key backend-side), so a plain connection never carries one.
-            if location.posture_check_required {
-                return Err(Error::PostureCheckFailed(POSTURE_UNSUPPORTED.into()).into());
-            }
-            connect_location_with_psk(location, None, &handle).await?;
+            // key backend-side), so the only key resolved here is for posture-only
+            // locations.
+            let preshared_key = if location.posture_check_required {
+                xguard_client_core::posture::authorize_location(&DB_POOL, &location)
+                    .await
+                    .map_err(|err| match err {
+                        mfa::MfaError::PostureRejected { message } => {
+                            Error::PostureCheckFailed(message)
+                        }
+                        other => Error::InternalError(other.to_string()),
+                    })?
+            } else {
+                None
+            };
+            connect_location_with_psk(location, preshared_key, &handle).await?;
         } else {
             error!(
                 "Location with ID {location_id} not found in the database, aborting connection \
@@ -1445,10 +1452,11 @@ pub fn get_platform_header() -> String {
     construct_platform_header()
 }
 
-/// Device posture reports are not supported yet.
+/// The posture facts this device would report: an attestation by the client, not proof.
 #[tauri::command(async)]
-pub async fn get_posture_data() -> Result<(), Error> {
-    Err(Error::PostureCheckFailed(POSTURE_UNSUPPORTED.into()))
+pub async fn get_posture_data(
+) -> Result<xguard_client_proto::xguard::client_types::DevicePostureFacts, Error> {
+    Ok(xguard_client_core::posture::collect().await)
 }
 
 #[derive(Debug, Serialize)]
@@ -1853,13 +1861,17 @@ async fn mfa_start_request(
         .ensure_no_route_conflict(&DB_POOL, None)
         .await
         .map_err(|err| err.to_string())?;
-    if location.posture_check_required {
-        return Err(POSTURE_UNSUPPORTED.into());
-    }
+    // Locations with posture policies check the device while MFA starts.
+    let posture = if location.posture_check_required {
+        Some(xguard_client_core::posture::collect().await)
+    } else {
+        None
+    };
     Ok(mfa::MfaStartRequest {
         location_id: location.network_id,
         pubkey: keys.pubkey,
         selected_methods: step_methods.to_vec(),
+        posture,
     })
 }
 
@@ -3084,6 +3096,7 @@ mod tests {
             location_id: 1,
             pubkey: "pk".into(),
             selected_methods: vec![method],
+            posture: None,
         }
     }
 
