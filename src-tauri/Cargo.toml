@@ -186,6 +186,11 @@ tauri-plugin-autostart = "2"
 nix.workspace = true
 tokio-stream.workspace = true
 
+# FIDO2 security keys over CTAP2/USB HID (`src/security_key/hid.rs`). Windows only lets elevated
+# processes open a key over HID, so it is not used there. Needs libudev on Linux (hidapi).
+[target.'cfg(not(windows))'.dependencies]
+ctap-hid-fido2 = "3.6"
+
 [target.'cfg(windows)'.dependencies]
 async-stream.workspace = true
 futures-core.workspace = true
