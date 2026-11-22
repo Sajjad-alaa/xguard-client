@@ -5,11 +5,11 @@ use std::{collections::HashSet, time::Duration};
 
 use tracing::debug;
 use xguard_core::{
-    config_sync::{sync_instance, PollError, SyncError, TunnelAction},
+    ConnectionType,
+    config_sync::{PollError, SyncError, TunnelAction, sync_instance},
     connection::active_state::active_state,
     database::models::instance::Instance,
     service_locations::sync_service_locations,
-    ConnectionType,
 };
 
 use crate::state::State;
@@ -61,7 +61,12 @@ async fn sync_all(state: &State) {
                         report.instance_name
                     );
                 }
-                if let Err(err) = sync_service_locations(&state.pool, &instance).await {
+                let target = Instance::find_by_id(&state.pool, instance.id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .unwrap_or(instance);
+                if let Err(err) = sync_service_locations(&state.pool, &target).await {
                     debug!("Failed to hand service locations to the background service: {err}");
                 }
             }

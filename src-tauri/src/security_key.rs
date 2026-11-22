@@ -22,13 +22,14 @@ use std::{
 };
 
 use reqwest::Url;
+use secrecy::{ExposeSecret, SecretString};
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
 #[cfg_attr(windows, allow(unused_imports))]
 use protocol::{
-    client_data_json, decode_credential_ids, parse_creation_options, registration_response,
-    validate_challenge, ClientDataType, RelyingParty,
+    ClientDataType, RelyingParty, client_data_json, decode_credential_ids, parse_creation_options,
+    registration_response, validate_challenge,
 };
 
 /// How long a ceremony may wait for the user to touch the key.
@@ -141,9 +142,9 @@ where
 }
 
 #[cfg(not(windows))]
-fn required_pin(pin: Option<String>) -> Result<String, Fido2Error> {
+fn required_pin(pin: Option<SecretString>) -> Result<SecretString, Fido2Error> {
     match pin {
-        Some(pin) if !pin.is_empty() => Ok(pin),
+        Some(pin) if !pin.expose_secret().is_empty() => Ok(pin),
         _ => Err(Fido2Error::PinRequired),
     }
 }
@@ -153,7 +154,7 @@ pub async fn assert_for_mfa(
     instance_url: &Url,
     challenge: &str,
     credential_ids: &[String],
-    pin: Option<String>,
+    pin: Option<SecretString>,
     _context: PlatformContext,
     cancel: CancellationToken,
 ) -> Result<Assertion, Fido2Error> {
@@ -165,7 +166,7 @@ pub async fn assert_for_mfa(
     {
         let pin = required_pin(pin)?;
         run_ceremony(cancel, move || {
-            hid::get_assertion(&rp.id, &client_data, &credential_ids, &pin)
+            hid::get_assertion(&rp.id, &client_data, &credential_ids, pin.expose_secret())
         })
         .await
     }
@@ -181,7 +182,7 @@ pub async fn assert_for_mfa(
 pub async fn register_security_key(
     challenge: &str,
     instance_url: &Url,
-    pin: Option<String>,
+    pin: Option<SecretString>,
     _context: PlatformContext,
     cancel: CancellationToken,
 ) -> Result<String, Fido2Error> {
@@ -193,7 +194,7 @@ pub async fn register_security_key(
         let pin = required_pin(pin)?;
         let (credential_id, auth_data) = run_ceremony(cancel, {
             let client_data = client_data.clone();
-            move || hid::make_credential(&options, &client_data, &pin)
+            move || hid::make_credential(&options, &client_data, pin.expose_secret())
         })
         .await?;
         Ok(registration_response(
@@ -247,7 +248,7 @@ mod tests {
             &url,
             "bad\"challenge-0000000",
             &ids,
-            Some("1234".into()),
+            Some(SecretString::from("1234")),
             PlatformContext::default(),
             CancellationToken::new(),
         )
@@ -258,7 +259,7 @@ mod tests {
             &Url::parse("https://192.168.1.1").unwrap(),
             "q83vEjRWeJA-_q83vEjRWeJA",
             &ids,
-            Some("1234".into()),
+            Some(SecretString::from("1234")),
             PlatformContext::default(),
             CancellationToken::new(),
         )

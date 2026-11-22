@@ -9,21 +9,21 @@
 //!
 //! The facts are an attestation by this client, not proof: the server cannot verify them.
 
-use std::time::Duration;
+use std::{net::IpAddr, sync::LazyLock, time::Duration};
 
 use chrono::Utc;
-use reqwest::{StatusCode, Url};
+use reqwest::{Client, StatusCode, Url, redirect::Policy};
 use xguard_client_proto::xguard::client_types::{
     DevicePostureFacts, PostureConnectRequest, PostureConnectResponse, PostureOs,
 };
 
 use crate::{
     database::{
-        models::{instance::Instance, location::Location, wireguard_keys::WireguardKeys, Id},
         DbPool,
+        models::{Id, instance::Instance, location::Location, wireguard_keys::WireguardKeys},
     },
     mfa::MfaError,
-    proxy::{construct_platform_header, http_client},
+    proxy::construct_platform_header,
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
 
@@ -110,6 +110,59 @@ pub fn rejection_reasons(message: &str) -> String {
         .join(", ")
 }
 
+/// Upper bound on a posture connect response.
+const MAX_POSTURE_RESPONSE_BYTES: usize = 1024 * 1024;
+const POSTURE_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const POSTURE_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Never follows redirects so the device polling token and posture cannot be redirected elsewhere.
+static POSTURE_HTTP_CLIENT: LazyLock<Client> = LazyLock::new(|| {
+    Client::builder()
+        .redirect(Policy::none())
+        .connect_timeout(POSTURE_CONNECT_TIMEOUT)
+        .build()
+        .unwrap_or_else(|err| {
+            warn!("Failed to build posture HTTP client: {err}");
+            Client::new()
+        })
+});
+
+fn is_loopback_host(url: &Url) -> bool {
+    match url.host() {
+        Some(url::Host::Domain(domain)) => domain.eq_ignore_ascii_case("localhost"),
+        Some(url::Host::Ipv4(ip)) => IpAddr::V4(ip).is_loopback(),
+        Some(url::Host::Ipv6(ip)) => IpAddr::V6(ip).is_loopback(),
+        None => false,
+    }
+}
+
+/// Builds the posture connect endpoint for `proxy_url`, requiring HTTPS (or loopback HTTP), no
+/// embedded credentials, and preserving any path prefix on `proxy_url`.
+pub fn posture_connect_url(proxy_url: &Url) -> Result<Url, MfaError> {
+    let invalid = |reason: &str| MfaError::Other {
+        message: format!("Refusing to send device posture to {proxy_url}: {reason}"),
+    };
+    let secure = proxy_url.scheme() == "https"
+        || (proxy_url.scheme() == "http" && is_loopback_host(proxy_url));
+    if !secure {
+        return Err(invalid("URL must use HTTPS"));
+    }
+    if !proxy_url.username().is_empty() || proxy_url.password().is_some() {
+        return Err(invalid("URL must not contain credentials"));
+    }
+    let mut base = proxy_url.clone();
+    base.set_query(None);
+    base.set_fragment(None);
+    if !base.path().ends_with('/') {
+        let path = format!("{}/", base.path());
+        base.set_path(&path);
+    }
+    base.join("api/v1/posture/connect")
+        .map_err(|err| MfaError::Other {
+            message: format!("Failed to build the posture URL: {err}"),
+        })
+}
+
 /// Connects to a location that has posture policies but no MFA: sends the facts to Edge and
 /// returns the session's preshared key (empty when the location no longer needs one).
 pub async fn posture_connect(
@@ -119,37 +172,62 @@ pub async fn posture_connect(
     token: String,
     posture: DevicePostureFacts,
 ) -> Result<String, MfaError> {
-    let url = proxy_url
-        .join("api/v1/posture/connect")
-        .map_err(|err| MfaError::Other {
-            message: format!("Failed to build the posture URL: {err}"),
-        })?;
+    let url = posture_connect_url(proxy_url)?;
     let request = PostureConnectRequest {
         location_id,
         pubkey,
         token,
         posture: Some(posture),
     };
-    let response = http_client()
+    let mut response = POSTURE_HTTP_CLIENT
         .post(url)
         .header(CLIENT_VERSION_HEADER, PKG_VERSION)
         .header(CLIENT_PLATFORM_HEADER, construct_platform_header())
-        .timeout(Duration::from_secs(30))
+        .timeout(POSTURE_REQUEST_TIMEOUT)
         .json(&request)
         .send()
         .await
         .map_err(|err| MfaError::NetworkError {
-            message: format!("Failed to reach proxy: {err}"),
+            message: format!("Failed to reach proxy: {}", err.without_url()),
         })?;
     let status = response.status();
+    if status.is_redirection() {
+        return Err(MfaError::ProxyError {
+            status: status.as_u16(),
+            message: format!("Refused redirect ({status})"),
+        });
+    }
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_POSTURE_RESPONSE_BYTES as u64)
+    {
+        return Err(MfaError::Other {
+            message: "Posture response exceeded size limit".into(),
+        });
+    }
+    let mut raw = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|err| MfaError::NetworkError {
+            message: format!("Failed to read proxy response: {}", err.without_url()),
+        })?
+    {
+        if raw.len() + chunk.len() > MAX_POSTURE_RESPONSE_BYTES {
+            return Err(MfaError::Other {
+                message: "Posture response exceeded size limit".into(),
+            });
+        }
+        raw.extend_from_slice(&chunk);
+    }
     if status.is_success() {
         let body: PostureConnectResponse =
-            response.json().await.map_err(|err| MfaError::Other {
+            serde_json::from_slice(&raw).map_err(|err| MfaError::Other {
                 message: format!("Invalid posture response: {err}"),
             })?;
         return Ok(body.preshared_key);
     }
-    let body: serde_json::Value = response.json().await.unwrap_or_default();
+    let body: serde_json::Value = serde_json::from_slice(&raw).unwrap_or_default();
     let message = body
         .get("error")
         .and_then(serde_json::Value::as_str)
@@ -207,8 +285,8 @@ pub async fn authorize_location(
 mod tests {
     use serde_json::json;
     use wiremock::{
-        matchers::{body_partial_json, method, path},
         Mock, MockServer, ResponseTemplate,
+        matchers::{body_partial_json, method, path},
     };
 
     use super::*;
@@ -312,5 +390,40 @@ mod tests {
             Some("posture_rejected"),
             "x"
         ));
+    }
+
+    #[test]
+    fn posture_connect_url_requires_tls_or_loopback_and_keeps_prefix() {
+        assert_eq!(
+            posture_connect_url(&Url::parse("https://edge.example.com/base?a=1#b").unwrap())
+                .unwrap()
+                .as_str(),
+            "https://edge.example.com/base/api/v1/posture/connect"
+        );
+        assert!(posture_connect_url(&Url::parse("http://127.0.0.1:8080/edge").unwrap()).is_ok());
+        assert!(posture_connect_url(&Url::parse("http://edge.example.com").unwrap()).is_err());
+        assert!(
+            posture_connect_url(&Url::parse("https://user:pw@edge.example.com").unwrap()).is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn posture_connect_refuses_redirects() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/posture/connect"))
+            .respond_with(
+                ResponseTemplate::new(307).insert_header("location", "https://evil.example/"),
+            )
+            .mount(&server)
+            .await;
+        let url = Url::parse(&server.uri()).unwrap();
+        let err = posture_connect(&url, 4, "pk".into(), "tok".into(), facts())
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, MfaError::ProxyError { status: 307, .. }),
+            "{err:?}"
+        );
     }
 }

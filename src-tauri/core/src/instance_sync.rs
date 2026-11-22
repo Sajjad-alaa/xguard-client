@@ -10,9 +10,9 @@ use sqlx::SqliteConnection;
 
 use crate::{
     database::models::{
-        instance::Instance,
-        location::{infer_mfa_method, Location},
         Id,
+        instance::Instance,
+        location::{Location, infer_mfa_method},
     },
     error::Error,
     into_location,
@@ -124,6 +124,13 @@ fn update_instance(
     let mut changed = instance.sync_mfa_state(&info);
     let fresh = Instance::from(info);
 
+    if instance.url != fresh.url || instance.proxy_url != fresh.proxy_url {
+        warn!(
+            "Ignoring server attempt to change URLs of instance {} (kept url={} proxy_url={})",
+            instance.name, instance.url, instance.proxy_url
+        );
+    }
+
     macro_rules! take {
         ($($field:ident),+) => {$(
             if instance.$field != fresh.$field {
@@ -134,8 +141,6 @@ fn update_instance(
     }
     take!(
         name,
-        url,
-        proxy_url,
         username,
         client_traffic_policy,
         enterprise_enabled,

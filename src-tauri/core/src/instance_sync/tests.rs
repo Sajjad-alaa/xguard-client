@@ -1,11 +1,11 @@
 use sqlx::SqlitePool;
 
-use super::{apply_device_config, SyncSummary};
+use super::{SyncSummary, apply_device_config};
 use crate::{
     database::models::{
+        Id,
         instance::Instance,
         location::{Location, LocationMfaMethod},
-        Id,
     },
     error::Error,
     proto::client_types::{DeviceConfig, DeviceConfigResponse, InstanceInfo},
@@ -278,10 +278,12 @@ async fn test_refresh_applies_client_settings(pool: SqlitePool) {
         Some(WirePolicy::ForceAllTraffic as i32);
     apply(&pool, &mut instance, refreshed).await.unwrap();
     let location = locations(&pool, &instance).await.remove(0);
-    assert!(location
-        .effective_route_all_traffic(&pool, Some(false))
-        .await
-        .unwrap());
+    assert!(
+        location
+            .effective_route_all_traffic(&pool, Some(false))
+            .await
+            .unwrap()
+    );
     assert!(!Instance::tunnels_disabled(&pool).await.unwrap());
 }
 
@@ -329,4 +331,23 @@ async fn test_tunnel_relevant_changes_and_policy(pool: SqlitePool) {
     assert_eq!(summary.tunnel_changed_ids, ids);
     assert!(summary.traffic_policy_changed);
     assert!(summary.instance_changed);
+}
+
+#[sqlx::test(migrations = "../migrations")]
+async fn test_url_and_proxy_url_stay_pinned_across_sync(pool: SqlitePool) {
+    let mut instance = setup(&pool, Vec::new()).await;
+    let mut req = response("office", Vec::new(), None);
+    let info = req.instance.as_mut().unwrap();
+    info.url = "https://attacker.example".into();
+    info.proxy_url = "https://evil-edge.example".into();
+
+    let summary = apply(&pool, &mut instance, req).await.unwrap();
+
+    assert!(!summary.instance_changed);
+    let stored = Instance::find_by_id(&pool, instance.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.url, "https://xguard.local");
+    assert_eq!(stored.proxy_url, "https://edge.xguard.local");
 }

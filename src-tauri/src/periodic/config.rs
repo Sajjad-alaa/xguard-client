@@ -15,18 +15,18 @@ use std::{
 use tauri::{AppHandle, Emitter};
 use tokio::{sync::Notify, time::sleep};
 use xguard_client_core::{
+    ConnectionType,
     config_sync::{
-        jitter_unit, network_fingerprint, sync_instance, Attempt, PollError, SyncError,
-        SyncSchedule, TunnelAction,
+        Attempt, PollError, SyncError, SyncSchedule, TunnelAction, jitter_unit,
+        network_fingerprint, plan_tunnel_actions, sync_instance,
     },
     connection::active_connections::ACTIVE_CONNECTIONS,
     database::{
-        models::{instance::Instance, Id},
         DB_POOL,
+        models::{Id, instance::Instance},
     },
     events::EventKey,
     service_locations::sync_service_locations,
-    ConnectionType,
 };
 
 use crate::{
@@ -70,7 +70,9 @@ async fn apply_actions(handle: &AppHandle, instance_name: &str, actions: Vec<Tun
     for action in actions {
         match action {
             TunnelAction::Disconnect(id) => {
-                info!("Location {id} was removed or is now run by the background service; disconnecting");
+                info!(
+                    "Location {id} was removed or is now run by the background service; disconnecting"
+                );
                 if let Err(err) = disconnect(id, ConnectionType::Location, handle.clone()).await {
                     warn!("Failed to disconnect location {id}: {err}");
                 }
@@ -148,7 +150,13 @@ async fn sync_one(handle: &AppHandle, instance_id: Id) -> Attempt {
     }
     let interval = report.interval;
     let name = report.instance_name.clone();
-    apply_actions(handle, &name, report.actions).await;
+    if let Some(summary) = &report.summary {
+        let fresh_active = active_location_ids().await;
+        let actions = plan_tunnel_actions(summary, &fresh_active, &report.after_locations);
+        apply_actions(handle, &name, actions).await;
+    } else {
+        apply_actions(handle, &name, report.actions).await;
+    }
 
     // Cheap when nothing changed (compared with what was last handed over).
     if let Ok(Some(instance)) = Instance::find_by_id(&*DB_POOL, instance_id).await {

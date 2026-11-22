@@ -1,17 +1,17 @@
 use std::{fmt, path::PathBuf, str::FromStr};
 #[cfg(unix)]
 use std::{
-    fs::{set_permissions, Permissions},
+    fs::{Permissions, set_permissions},
     os::unix::fs::PermissionsExt,
 };
 
 use chrono::{Duration, NaiveDateTime, Utc};
 use database::models::{
-    location::{
-        infer_mfa_method, legacy_mfa_steps, Location, LocationMfaMode, LocationMfaStep,
-        ServiceLocationMode,
-    },
     Id,
+    location::{
+        Location, LocationMfaMode, LocationMfaStep, ServiceLocationMode, infer_mfa_method,
+        legacy_mfa_steps,
+    },
 };
 use serde::{Deserialize, Serialize};
 use sqlx::types::Json;
@@ -247,7 +247,7 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
                 .collect::<Vec<_>>()
         }),
         mfa_step_plan: Json::default(),
-        client_mtu: dev_config.mtu,
+        client_mtu: dev_config.mtu.filter(|mtu| (576..=9200).contains(mtu)),
     }
 }
 
@@ -260,7 +260,7 @@ mod tests {
         MfaStepMethod as ProtoMfaStepMethod,
     };
 
-    use super::{get_aggregation, into_location, networks_conflict, DateTimeAggregation};
+    use super::{DateTimeAggregation, get_aggregation, into_location, networks_conflict};
     use crate::database::models::location::{LocationMfaMethod, LocationMfaMode};
 
     #[test]
@@ -345,6 +345,12 @@ mod tests {
         cfg.mtu = Some(1380);
         let location = into_location(cfg, 3);
         assert_eq!(location.client_mtu, Some(1380));
+
+        for invalid in [0, 100, 10_000] {
+            let mut cfg = base_dev_config();
+            cfg.mtu = Some(invalid);
+            assert_eq!(into_location(cfg, 3).client_mtu, None);
+        }
     }
 
     #[test]
@@ -379,10 +385,12 @@ mod tests {
                 LocationMfaMethod::MobileApprove
             ]
         );
-        assert!(location.mfa_steps.0[0]
-            .methods
-            .iter()
-            .all(|entry| entry.configured));
+        assert!(
+            location.mfa_steps.0[0]
+                .methods
+                .iter()
+                .all(|entry| entry.configured)
+        );
     }
 
     #[test]

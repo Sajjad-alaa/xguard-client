@@ -30,40 +30,62 @@ pub fn gsettings_bool(output: &str) -> Option<bool> {
     }
 }
 
-/// KDE `kscreenlockerrc`: `[Daemon] Autolock=false` disables the automatic lock (default on).
+/// Output of `gsettings get org.gnome.desktop.session idle-delay`: `uint32 <secs>`.
+/// Zero disables screen blanking / locking.
 #[must_use]
-pub fn kde_autolock(conf: Option<&str>) -> bool {
-    let Some(conf) = conf else {
-        return true;
-    };
+pub fn gnome_idle_delay_nonzero(output: &str) -> Option<bool> {
+    let secs: u32 = output.trim().strip_prefix("uint32")?.trim().parse().ok()?;
+    Some(secs > 0)
+}
+
+/// KDE `kscreenlockerrc`: `[Daemon] Autolock=false` disables the automatic lock; `None` if unreadable.
+#[must_use]
+pub fn kde_autolock(conf: Option<&str>) -> Option<bool> {
+    let conf = conf?;
     let mut in_daemon = false;
     for line in conf.lines().map(str::trim) {
         if line.starts_with('[') {
             in_daemon = line == "[Daemon]";
         } else if in_daemon {
             if let Some(value) = line.strip_prefix("Autolock=") {
-                return !value.trim().eq_ignore_ascii_case("false");
+                return Some(!value.trim().eq_ignore_ascii_case("false"));
             }
         }
     }
-    true
+    Some(true)
 }
 
 /// The root mount from `/proc/self/mountinfo`: its `major:minor` and mount source.
+/// Picks the last `/` mount entry and skips initial `rootfs` mounts.
 #[must_use]
 pub fn root_mount(mountinfo: &str) -> Option<(u32, u32, String)> {
+    let mut found = None;
     for line in mountinfo.lines() {
         let fields: Vec<&str> = line.split_whitespace().collect();
         // id parent major:minor root mount-point options ... - fstype source super-options
         if fields.len() < 10 || fields[4] != "/" {
             continue;
         }
-        let (major, minor) = fields[2].split_once(':')?;
-        let separator = fields.iter().position(|f| *f == "-")?;
-        let source = fields.get(separator + 2)?.to_string();
-        return Some((major.parse().ok()?, minor.parse().ok()?, source));
+        let Some(separator) = fields.iter().position(|f| *f == "-") else {
+            continue;
+        };
+        let Some(&fstype) = fields.get(separator + 1) else {
+            continue;
+        };
+        if fstype == "rootfs" {
+            continue;
+        }
+        let (Some((major, minor)), Some(source)) =
+            (fields[2].split_once(':'), fields.get(separator + 2))
+        else {
+            continue;
+        };
+        let (Ok(major), Ok(minor)) = (major.parse(), minor.parse()) else {
+            continue;
+        };
+        found = Some((major, minor, (*source).to_string()));
     }
-    None
+    found
 }
 
 /// Whether the block device at `block_dir` (a `/sys/class/block/<name>` style directory) is a
@@ -138,10 +160,11 @@ pub fn macos_screen_lock(output: &str) -> Option<bool> {
 }
 
 /// `csrutil status`: "System Integrity Protection status: enabled.".
+/// Rejects custom configurations such as `"enabled (Custom Configuration)."` so SIP must be fully on.
 #[must_use]
 pub fn sip_enabled(output: &str) -> Option<bool> {
-    let status = output.split("status:").nth(1)?.trim_start();
-    if status.starts_with("enabled") {
+    let status = output.split("status:").nth(1)?.trim();
+    if status == "enabled." || status == "enabled" {
         Some(true)
     } else if status.starts_with("disabled") {
         Some(false)
@@ -199,7 +222,7 @@ pub fn windows_report(report: &str) -> WindowsReport {
                 .or_else(|| report_bool(report, &format!("fw_{profile}")))
         })
         .collect();
-    let firewall_enabled = if profiles.iter().any(|p| *p == Some(false)) {
+    let firewall_enabled = if profiles.contains(&Some(false)) {
         Some(false)
     } else if profiles.iter().all(|p| *p == Some(true)) {
         Some(true)
@@ -255,12 +278,16 @@ mod tests {
         assert_eq!(gsettings_bool("true\n"), Some(true));
         assert_eq!(gsettings_bool("false"), Some(false));
         assert_eq!(gsettings_bool("No such schema"), None);
-        assert!(kde_autolock(None));
-        assert!(kde_autolock(Some("[Daemon]\nTimeout=5\n")));
-        assert!(!kde_autolock(Some(
-            "[Greeter]\nAutolock=true\n[Daemon]\nAutolock=false\n"
-        )));
-        assert!(kde_autolock(Some("[Other]\nAutolock=false\n")));
+        assert_eq!(gnome_idle_delay_nonzero("uint32 300\n"), Some(true));
+        assert_eq!(gnome_idle_delay_nonzero("uint32 0\n"), Some(false));
+        assert_eq!(gnome_idle_delay_nonzero("garbage"), None);
+        assert_eq!(kde_autolock(None), None);
+        assert_eq!(kde_autolock(Some("[Daemon]\nTimeout=5\n")), Some(true));
+        assert_eq!(
+            kde_autolock(Some("[Greeter]\nAutolock=true\n[Daemon]\nAutolock=false\n")),
+            Some(false)
+        );
+        assert_eq!(kde_autolock(Some("[Other]\nAutolock=false\n")), Some(true));
     }
 
     #[test]
@@ -272,6 +299,13 @@ mod tests {
         assert_eq!(
             root_mount(mountinfo),
             Some((253, 1, "/dev/mapper/vg-root".to_string()))
+        );
+        let initramfs_then_real = "\
+1 0 0:1 / / rw - rootfs rootfs rw
+29 1 253:2 / / rw,relatime - ext4 /dev/mapper/cryptroot rw";
+        assert_eq!(
+            root_mount(initramfs_then_real),
+            Some((253, 2, "/dev/mapper/cryptroot".to_string()))
         );
         let btrfs = "29 1 0:33 /@ / rw,relatime shared:1 - btrfs /dev/mapper/luks-1 rw";
         assert_eq!(

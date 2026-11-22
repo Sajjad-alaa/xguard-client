@@ -1,15 +1,15 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExecutor};
+use sqlx::{SqliteExecutor, prelude::Type, query, query_as, query_scalar, types::Json};
 
-use super::{location::LocationMfaMethod, Id, NoId};
+use super::{Id, NoId, location::LocationMfaMethod};
 use crate::{
     mfa_contract::MfaContract,
     proto::{self, client_types::OpenIdProviderKind as ProtoOpenIdProviderKind},
 };
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct Instance<I = NoId> {
     pub id: I,
     pub name: String,
@@ -32,6 +32,30 @@ pub struct Instance<I = NoId> {
     pub smtp_configured: Option<bool>,
     /// None when Core predates the report, read as available.
     pub openid_available: Option<bool>,
+}
+
+impl<I: fmt::Debug> fmt::Debug for Instance<I> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Instance")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("uuid", &self.uuid)
+            .field("url", &self.url)
+            .field("proxy_url", &self.proxy_url)
+            .field("username", &self.username)
+            .field("token", &self.token.as_ref().map(|_| "***"))
+            .field("client_traffic_policy", &self.client_traffic_policy)
+            .field("enterprise_enabled", &self.enterprise_enabled)
+            .field("disable_tunnels", &self.disable_tunnels)
+            .field("openid_display_name", &self.openid_display_name)
+            .field("openid_provider_kind", &self.openid_provider_kind)
+            .field("mfa_configured_methods", &self.mfa_configured_methods)
+            .field("mfa_contract", &self.mfa_contract)
+            .field("mfa_capabilities", &self.mfa_capabilities)
+            .field("smtp_configured", &self.smtp_configured)
+            .field("openid_available", &self.openid_available)
+            .finish()
+    }
 }
 
 /// Factors a Core accepts in an MFA configuration session, static per Core version. Only
@@ -562,10 +586,12 @@ mod tests {
         assert_eq!(by_name.id, instance.id);
 
         instance.delete(&pool).await.unwrap();
-        assert!(Instance::find_by_id(&pool, instance.id)
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            Instance::find_by_id(&pool, instance.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[sqlx::test(migrations = "../migrations")]
@@ -628,10 +654,7 @@ mod tests {
             .unwrap()
             .expect("instance should exist");
 
-        assert_eq!(
-            persisted.openid_display_name.as_deref(),
-            Some("XGuard SSO")
-        );
+        assert_eq!(persisted.openid_display_name.as_deref(), Some("XGuard SSO"));
     }
 
     #[test]

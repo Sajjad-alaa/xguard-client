@@ -1,8 +1,9 @@
 //! Validated, root-only storage of service locations: one JSON file per instance.
 
 use std::{
+    collections::HashSet,
     fs,
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -171,19 +172,45 @@ pub fn validate_endpoint(endpoint: &str) -> Result<String, StoreError> {
     Ok(endpoint.to_owned())
 }
 
+fn valid_dns_host(host: &str) -> bool {
+    if host.is_empty() || host.len() > MAX_HOST_LENGTH || host.starts_with('-') {
+        return false;
+    }
+    let trimmed = host.strip_suffix('.').unwrap_or(host);
+    !trimmed.is_empty()
+        && trimmed.split('.').all(|label| {
+            !label.is_empty()
+                && label.len() <= 63
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        })
+}
+
 fn validate_dns(dns: &str) -> Result<Option<String>, StoreError> {
     let dns = dns.trim();
     if dns.is_empty() {
         return Ok(None);
     }
-    if dns.len() > MAX_LIST_LENGTH
-        || !dns
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b".:-,_ []".contains(&b))
-    {
-        return Err(invalid("dns", "unexpected characters"));
+    if dns.len() > MAX_LIST_LENGTH {
+        return Err(invalid("dns", "too long"));
     }
-    Ok(Some(dns.to_owned()))
+    let mut entries = Vec::new();
+    for entry in dns.split(',').map(str::trim).filter(|e| !e.is_empty()) {
+        if entry.parse::<std::net::IpAddr>().is_err() && !valid_dns_host(entry) {
+            return Err(invalid(
+                "dns",
+                format!("{entry:?} is not an IP or hostname"),
+            ));
+        }
+        entries.push(entry);
+    }
+    if entries.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(entries.join(",")))
 }
 
 impl StoredInstance {
@@ -242,7 +269,11 @@ impl StoredInstance {
         if self.locations.len() > MAX_LOCATIONS_PER_INSTANCE {
             return Err(StoreError::TooManyLocations);
         }
+        let mut seen_ids = HashSet::with_capacity(self.locations.len());
         for location in &self.locations {
+            if !seen_ids.insert(location.network_id) {
+                return Err(invalid("network_id", "duplicate"));
+            }
             validate_key("pubkey", &location.pubkey)?;
             validate_name(&location.name)?;
             validate_addresses("address", &location.address)?;
@@ -250,6 +281,12 @@ impl StoredInstance {
             validate_endpoint(&location.endpoint)?;
             if let Some(dns) = &location.dns {
                 validate_dns(dns)?;
+            }
+            if location.keepalive_interval > 3600 {
+                return Err(invalid("keepalive_interval", "too large"));
+            }
+            if location.mtu.is_some_and(|mtu| !(576..=9200).contains(&mtu)) {
+                return Err(invalid("mtu", "out of range"));
             }
         }
         Ok(())
@@ -371,6 +408,26 @@ impl Store {
 
     /// Everything stored. Files that are unreadable, oversized, links or invalid are skipped.
     pub fn load_all(&self) -> Vec<StoredInstance> {
+        #[cfg(unix)]
+        match fs::symlink_metadata(&self.dir) {
+            Ok(_) => {
+                if let Err(err) = check_dir_private(&self.dir) {
+                    tracing::error!(
+                        "Refusing service locations directory {}: {err}",
+                        self.dir.display()
+                    );
+                    return Vec::new();
+                }
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Vec::new(),
+            Err(err) => {
+                tracing::error!(
+                    "Failed to stat service locations directory {}: {err}",
+                    self.dir.display()
+                );
+                return Vec::new();
+            }
+        }
         let files = match self.instance_files() {
             Ok(files) => files,
             Err(err) => {
@@ -392,16 +449,65 @@ impl Store {
     }
 }
 
-fn load_file(path: &Path) -> Result<StoredInstance, StoreError> {
-    let metadata = fs::symlink_metadata(path)?;
-    if !metadata.file_type().is_file() {
-        return Err(StoreError::Io("not a regular file".into()));
+#[cfg(unix)]
+fn check_dir_private(dir: &Path) -> Result<(), StoreError> {
+    use std::os::unix::fs::MetadataExt;
+    let metadata = fs::symlink_metadata(dir)?;
+    if !metadata.file_type().is_dir() {
+        return Err(StoreError::Io("not a directory".into()));
     }
-    if metadata.len() > MAX_FILE_SIZE {
+    if metadata.uid() != nix::unistd::geteuid().as_raw() {
+        return Err(StoreError::Io("unexpected directory owner".into()));
+    }
+    if metadata.mode() & 0o077 != 0 {
+        return Err(StoreError::Io("directory permissions too open".into()));
+    }
+    Ok(())
+}
+
+fn load_file(path: &Path) -> Result<StoredInstance, StoreError> {
+    let file = {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+            let file = fs::OpenOptions::new()
+                .read(true)
+                .custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_NONBLOCK)
+                .open(path)?;
+            let metadata = file.metadata()?;
+            if !metadata.file_type().is_file() {
+                return Err(StoreError::Io("not a regular file".into()));
+            }
+            if metadata.uid() != nix::unistd::geteuid().as_raw() {
+                return Err(StoreError::Io("unexpected file owner".into()));
+            }
+            if metadata.mode() & 0o077 != 0 {
+                return Err(StoreError::Io("file permissions too open".into()));
+            }
+            if metadata.len() > MAX_FILE_SIZE {
+                return Err(StoreError::Io("file too large".into()));
+            }
+            file
+        }
+        #[cfg(not(unix))]
+        {
+            let metadata = fs::symlink_metadata(path)?;
+            if !metadata.file_type().is_file() {
+                return Err(StoreError::Io("not a regular file".into()));
+            }
+            if metadata.len() > MAX_FILE_SIZE {
+                return Err(StoreError::Io("file too large".into()));
+            }
+            fs::File::open(path)?
+        }
+    };
+    let mut raw = Vec::new();
+    file.take(MAX_FILE_SIZE + 1).read_to_end(&mut raw)?;
+    if raw.len() as u64 > MAX_FILE_SIZE {
         return Err(StoreError::Io("file too large".into()));
     }
-    let instance: StoredInstance = serde_json::from_str(&fs::read_to_string(path)?)
-        .map_err(|err| StoreError::Io(err.to_string()))?;
+    let instance: StoredInstance =
+        serde_json::from_slice(&raw).map_err(|err| StoreError::Io(err.to_string()))?;
     instance.validate_loaded()?;
     let expected = path.file_stem().and_then(|stem| stem.to_str());
     if expected != Some(instance.instance_id.as_str()) {

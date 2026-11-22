@@ -10,31 +10,31 @@ use std::{
 use std::{fs, path::Path};
 
 #[cfg(target_os = "linux")]
-use nix::unistd::{chown, Group};
+use nix::unistd::{Group, chown};
 #[cfg(unix)]
 use tokio::net::UnixListener;
 #[cfg(target_os = "linux")]
 use tokio::{
-    signal::unix::{signal, SignalKind},
+    signal::unix::{SignalKind, signal},
     sync::oneshot,
 };
 use tokio::{sync::mpsc, task::JoinHandle, time::interval};
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::{
-    codegen::tokio_stream::{wrappers::ReceiverStream, Stream},
-    transport::Server,
     Code, Response, Status,
+    codegen::tokio_stream::{Stream, wrappers::ReceiverStream},
+    transport::Server,
 };
-use tracing::{debug, error, info, info_span, warn, Instrument};
+use tracing::{Instrument, debug, error, info, info_span, warn};
 use xguard_client_common::dns_borrow;
 use xguard_client_proto::{
     conversions::normalize_allowed_ips,
     xguard::client::v1::{
-        desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
         CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
         ListInterfacesResponse, ManagedInterfaceData, ReadInterfaceDataRequest,
         RemoveInterfaceRequest, SaveServiceLocationsRequest,
+        desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
     },
 };
 #[cfg(not(target_os = "macos"))]
@@ -42,18 +42,18 @@ use xguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
 use xguard_wireguard_rs::Userspace;
 use xguard_wireguard_rs::{
-    error::WireguardInterfaceError, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
+    InterfaceConfiguration, WGApi, WireguardInterfaceApi, error::WireguardInterfaceError,
 };
 
 #[cfg(windows)]
-use crate::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
+use crate::named_pipe::{PIPE_NAME, get_named_pipe_server_stream};
 #[cfg(any(windows, target_os = "linux"))]
 use crate::service_locations::{
-    run_reconciler,
-    store::{validate_instance_id, Store, StoreError, StoredInstance},
-    wake_reconciler, ServiceLocationManager,
+    ServiceLocationManager, run_reconciler,
+    store::{Store, StoreError, StoredInstance, validate_instance_id},
+    wake_reconciler,
 };
-use crate::{config::Config, VERSION};
+use crate::{VERSION, config::Config};
 
 /// Starts the service-location reconciler; returns the manager the RPCs use.
 #[cfg(any(windows, target_os = "linux"))]
@@ -136,7 +136,7 @@ impl DaemonService {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 impl DaemonService {
     fn stop_stat_tasks(&self) {
         match self.stat_tasks.lock() {
@@ -151,8 +151,10 @@ impl DaemonService {
 
     fn remove_interfaces(&self) {
         match self.wgapis.write() {
-            Ok(mut wgapis) => {
-                for (ifname, wgapi) in wgapis.drain() {
+            Ok(mut wgapis) =>
+            {
+                #[allow(unused_mut)]
+                for (ifname, mut wgapi) in wgapis.drain() {
                     match wgapi.remove_interface() {
                         Ok(()) => info!("Removed WireGuard interface {ifname} during shutdown"),
                         Err(err) => error!(
@@ -227,11 +229,17 @@ pub(crate) fn configure_interface(
             "The following DNS servers will be set: {dns:?}, search domains: \
                 {search_domains:?}"
         );
-        wgapi.configure_dns(&dns, &search_domains).map_err(|err| {
+        if let Err(err) = wgapi.configure_dns(&dns, &search_domains) {
+            #[cfg(not(windows))]
+            for peer in &interface_config.peers {
+                if let Some(endpoint) = peer.endpoint {
+                    let _ = wgapi.remove_endpoint_routing(&endpoint.to_string());
+                }
+            }
             let msg = format!("Failed to configure DNS for WireGuard interface {ifname}: {err}");
             error!("{msg}");
-            Status::new(Code::Internal, msg)
-        })?;
+            return Err(Status::new(Code::Internal, msg));
+        }
     }
 
     Ok(())
@@ -707,24 +715,38 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 }
 
 #[cfg(windows)]
-pub(crate) async fn run_server(config: Config) -> anyhow::Result<()> {
+pub(crate) async fn run_server(
+    config: Config,
+    shutdown_rx: tokio::sync::oneshot::Receiver<()>,
+) -> anyhow::Result<()> {
     debug!("Starting XGuard interface management daemon");
 
     let stream = get_named_pipe_server_stream();
-    // Service locations run for the life of the service; Windows removes the tunnels when the
-    // process ends.
-    let (service_locations, _reconciler) = start_service_locations();
-    let daemon_service = DaemonService::new(&config).with_service_locations(service_locations);
+    let (service_locations, reconciler) = start_service_locations();
+    let daemon_service = Arc::new(
+        DaemonService::new(&config).with_service_locations(Arc::clone(&service_locations)),
+    );
 
     info!("XGuard daemon version {VERSION} started, listening on named pipe {PIPE_NAME}");
     debug!("XGuard daemon configuration: {config:?}");
 
-    Server::builder()
+    let server_result = Server::builder()
         .trace_fn(|_| tracing::info_span!("xguard_client_service"))
-        .add_service(DesktopDaemonServiceServer::new(daemon_service))
-        .serve_with_incoming(stream)
-        .await?;
+        .add_service(DesktopDaemonServiceServer::from_arc(Arc::clone(
+            &daemon_service,
+        )))
+        .serve_with_incoming_shutdown(stream, async {
+            let _ = shutdown_rx.await;
+        })
+        .await;
 
+    daemon_service.stop_stat_tasks();
+    daemon_service.remove_interfaces();
+    reconciler.abort();
+    let _ = reconciler.await;
+    service_locations.lock().await.shut_down();
+
+    server_result?;
     Ok(())
 }
 

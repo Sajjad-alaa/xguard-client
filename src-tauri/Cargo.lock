@@ -8893,6 +8893,7 @@ dependencies = [
  "regex",
  "reqwest 0.13.5",
  "rust-ini",
+ "secrecy",
  "serde",
  "serde_json",
  "serde_with",

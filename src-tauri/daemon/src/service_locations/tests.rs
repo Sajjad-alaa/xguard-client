@@ -5,8 +5,8 @@ use xguard_client_proto::xguard::client::v1::{
 };
 
 use super::{
-    reconciler::{desired_tunnels, interface_name, plan, wanted, Action, TunnelKey},
-    store::{validate_endpoint, validate_instance_id, Mode, Store, StoreError, StoredInstance},
+    reconciler::{Action, TunnelKey, desired_tunnels, interface_name, plan, wanted},
+    store::{Mode, Store, StoreError, StoredInstance, validate_endpoint, validate_instance_id},
 };
 
 const INSTANCE: &str = "2b9a4b8e-8b8e-4d4e-9a3f-1c2d3e4f5a6b";
@@ -102,6 +102,12 @@ fn requests_are_validated_and_canonicalized() {
         reject(&|r| r.service_locations[0].dns = "1.1.1.1\n$(id)".into()),
         StoreError::Invalid { field: "dns", .. }
     ));
+    for bad_dns in ["--flag", "[bad]", "foo bar", "1.1.1.1, -bad"] {
+        assert!(matches!(
+            reject(&|r| r.service_locations[0].dns = bad_dns.into()),
+            StoreError::Invalid { field: "dns", .. }
+        ));
+    }
     assert!(matches!(
         reject(&|r| r.service_locations[0].name = "bad\u{7}name".into()),
         StoreError::Invalid { field: "name", .. }
@@ -202,6 +208,22 @@ fn store_saves_privately_and_round_trips() {
         .replace("vpn.example.com:51820", "vpn.example.com");
     std::fs::write(&file, tampered).unwrap();
     assert!(store.load_all().is_empty());
+
+    // Tampered MTU, duplicate network ID, or lax permissions are also refused.
+    let bad_mtu = serde_json::to_string_pretty(&instance)
+        .unwrap()
+        .replace("1380", "10");
+    std::fs::write(&file, bad_mtu).unwrap();
+    assert!(store.load_all().is_empty());
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        store.save(&instance).unwrap();
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(store.load_all().is_empty());
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
 
     // An empty list deletes.
     store.save(&instance).unwrap();

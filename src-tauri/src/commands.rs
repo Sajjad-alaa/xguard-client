@@ -3,6 +3,7 @@ use std::{collections::HashMap, env, future::Future, str::FromStr, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 use reqwest::Url;
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
@@ -13,23 +14,24 @@ use xguard_client_core::connection::daemon_client::DAEMON_CLIENT;
 use xguard_client_core::{
     config_sync::forget_revision,
     connection::{
-        active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
-        disconnect_interface, ConflictingConnection, ConnectionTarget,
+        ConflictingConnection, ConnectionTarget,
+        active_connections::{ACTIVE_CONNECTIONS, find_connection, get_connection_id_by_type},
+        disconnect_interface,
     },
     enrollment::{self},
     instance_sync::apply_device_config,
     mfa::{self, MfaAuthSession},
     mfa_config::{self, AuthorizeProof, MfaConfigError, MfaConfigSession, SetupProof},
     mfa_contract::MfaContract,
-    provisioning::{mark_consumed, ProvisioningConfig},
+    provisioning::{ProvisioningConfig, mark_consumed},
     service_locations::{remove_service_locations, sync_service_locations},
 };
 #[cfg(not(target_os = "macos"))]
 use xguard_client_proto::xguard::client::v1::RemoveInterfaceRequest;
 use xguard_client_proto::xguard::client_types::{
-    mfa_step_result, AdminInfo, CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse,
-    DeviceConfigResponse, EnrollmentSettings, InitialUserInfo, InstanceInfo as ProtoInstanceInfo,
-    MfaConfigAuthorizeResponse, MfaFido2Assertion, MfaMethod,
+    AdminInfo, CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
+    EnrollmentSettings, InitialUserInfo, InstanceInfo as ProtoInstanceInfo,
+    MfaConfigAuthorizeResponse, MfaFido2Assertion, MfaMethod, mfa_step_result,
 };
 
 const UPDATE_URL: &str = "https://pkgs.xguard.local/api/update/check";
@@ -37,30 +39,31 @@ const UPDATE_URL: &str = "https://pkgs.xguard.local/api/update/check";
 #[cfg(not(target_os = "macos"))]
 use crate::utils::execute_command;
 use crate::{
+    CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
     app_config::{AppConfig, AppConfigPatch},
     appstate::{AppState, Ceremony},
     database::{
+        DB_POOL,
         models::{
+            Id, NoId,
             connection::{ActiveConnection, Connection, ConnectionInfo},
-            instance::{mfa_contract_from_instance_info, Instance, InstanceInfo},
+            instance::{Instance, InstanceInfo, mfa_contract_from_instance_info},
             location::{Location, LocationMfaMethod, LocationMfaMode, LocationMfaStep},
             location_stats::LocationStats,
             tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
             wireguard_keys::WireguardKeys,
-            Id, NoId,
         },
-        DB_POOL,
     },
     error::Error,
     events::{AddInstancePayload, EventKey, TunnelsDisabledPayload, TunnelsEnabledPayload},
-    fido2_window::{platform_context, WindowLevelGuard},
+    fido2_window::{WindowLevelGuard, platform_context},
     into_location,
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
     proxy::construct_platform_header,
-    security_key::{self, pin_policy, Assertion, Fido2Error, PinPolicy, PlatformContext},
+    security_key::{self, Assertion, Fido2Error, PinPolicy, PlatformContext, pin_policy},
     tauri_err_to_app_err,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
@@ -68,7 +71,6 @@ use crate::{
         handle_connection_for_location, handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
-    CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
 
 #[derive(Debug, Serialize, thiserror::Error)]
@@ -502,12 +504,18 @@ pub async fn save_device_config(
     response: DeviceConfigResponse,
     handle: AppHandle,
 ) -> Result<SaveDeviceConfigResponse, Error> {
-    debug!("Saving device configuration: {response:#?}.");
-
-    let mut transaction = DB_POOL.begin().await?;
     let instance_info = response.instance.ok_or_else(|| {
         Error::ResourceNotFound("instance info in device config response".to_string())
     })?;
+    debug!(
+        "Saving device configuration for instance {} ({}): {} location(s), has_token={}.",
+        instance_info.name,
+        instance_info.id,
+        response.configs.len(),
+        response.token.is_some()
+    );
+
+    let mut transaction = DB_POOL.begin().await?;
     let mut instance = Instance::from(instance_info);
     if response.token.is_some() {
         debug!(
@@ -1364,9 +1372,32 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
     Ok(())
 }
 
+fn validate_external_link(link: &str) -> Result<Url, Error> {
+    let url = Url::parse(link).map_err(|err| Error::CommandError(format!("Invalid URL: {err}")))?;
+    let loopback = match url.host_str() {
+        Some(host) => {
+            host.eq_ignore_ascii_case("localhost")
+                || host
+                    .trim_start_matches('[')
+                    .trim_end_matches(']')
+                    .parse::<std::net::IpAddr>()
+                    .is_ok_and(|ip| ip.is_loopback())
+        }
+        None => false,
+    };
+    let safe_scheme = url.scheme() == "https" || (url.scheme() == "http" && loopback);
+    if !safe_scheme || !url.username().is_empty() || url.password().is_some() {
+        return Err(Error::CommandError(
+            "Refusing to open untrusted or non-HTTPS URL".to_string(),
+        ));
+    }
+    Ok(url)
+}
+
 #[tauri::command]
 pub fn open_link(link: &str) -> Result<(), Error> {
-    match webbrowser::open(link) {
+    let url = validate_external_link(link)?;
+    match webbrowser::open(url.as_str()) {
         Ok(()) => Ok(()),
         Err(e) => Err(Error::CommandError(e.to_string())),
     }
@@ -1516,8 +1547,8 @@ pub fn get_platform_header() -> String {
 
 /// The posture facts this device would report: an attestation by the client, not proof.
 #[tauri::command(async)]
-pub async fn get_posture_data(
-) -> Result<xguard_client_proto::xguard::client_types::DevicePostureFacts, Error> {
+pub async fn get_posture_data()
+-> Result<xguard_client_proto::xguard::client_types::DevicePostureFacts, Error> {
     Ok(xguard_client_core::posture::collect().await)
 }
 
@@ -2244,15 +2275,18 @@ pub async fn mfa_connect_mobile_approve(
 
 /// The PIN to hand the ceremony, if this platform expects one from us. A platform that runs
 /// the ceremony collects it in its own dialog, so anything the frontend sent is dropped.
-fn fido2_pin(pin: Option<String>) -> Result<Option<String>, &'static str> {
+fn fido2_pin(pin: Option<String>) -> Result<Option<SecretString>, &'static str> {
     if pin_policy() == PinPolicy::Platform {
         return Ok(None);
     }
-    let pin = pin.unwrap_or_default().trim().to_string();
+    let pin = pin.unwrap_or_default();
     if pin.is_empty() {
         return Err("PIN is required");
     }
-    Ok(Some(pin))
+    if pin.len() > 63 {
+        return Err("PIN must be at most 63 bytes");
+    }
+    Ok(Some(SecretString::from(pin)))
 }
 
 /// one attempt per session since FIDO2 and OIDC share state on Core. claimed before the first
@@ -2446,7 +2480,7 @@ async fn fido2_challenge(
 async fn fido2_assertion(
     instance_url: Url,
     challenge: Fido2Challenge,
-    pin: Option<String>,
+    pin: Option<SecretString>,
     context: PlatformContext,
     cancel: CancellationToken,
 ) -> Result<Assertion, mfa::MfaError> {
@@ -2473,7 +2507,7 @@ async fn run_fido2_mfa(
     proxy_url: Url,
     instance_url: Url,
     start: Fido2Start,
-    pin: Option<String>,
+    pin: Option<SecretString>,
     window: WebviewWindow,
     cancel: CancellationToken,
     handle: AppHandle,
@@ -2897,8 +2931,12 @@ pub async fn mfa_config_oidc_url(
     let session = get_mfa_config_session(&state, &session_id)?;
     mfa_config::ensure_can_authorize_method(MfaMethod::Oidc, &session.capabilities)
         .map_err(err_to_json)?;
-    let mut url = session
-        .proxy_url
+    let mut base = session.proxy_url.clone();
+    if !base.path().ends_with('/') {
+        let path = format!("{}/", base.path());
+        base.set_path(&path);
+    }
+    let mut url = base
         .join("openid/mfa")
         .map_err(|err| mfa_config_other(format!("Failed to build OpenID URL: {err}")))?;
     url.query_pairs_mut()
@@ -3153,16 +3191,16 @@ pub async fn mfa_config_cancel(
 
 #[cfg(test)]
 mod tests {
-    use xguard_client_core::database::models::instance::MfaCapabilities;
-    use xguard_client_proto::xguard::client_types::{
-        mfa_flow_start_response, mfa_step_started, MfaAdvanced, MfaAwaitingExternal, MfaCompleted,
-        MfaFido2Challenge, MfaFlowStartAccepted, MfaFlowStartResponse, MfaFlowStepStartResponse,
-        MfaStepResult, MfaStepStarted,
-    };
     use serde_json::json;
     use wiremock::{
-        matchers::{method, path},
         Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
+    use xguard_client_core::database::models::instance::MfaCapabilities;
+    use xguard_client_proto::xguard::client_types::{
+        MfaAdvanced, MfaAwaitingExternal, MfaCompleted, MfaFido2Challenge, MfaFlowStartAccepted,
+        MfaFlowStartResponse, MfaFlowStepStartResponse, MfaStepResult, MfaStepStarted,
+        mfa_flow_start_response, mfa_step_started,
     };
 
     use super::*;
@@ -3571,9 +3609,10 @@ mod tests {
         .await
         .unwrap_err();
 
-        assert!(err
-            .to_string()
-            .contains("FIDO2 requires the multi-step MFA contract"));
+        assert!(
+            err.to_string()
+                .contains("FIDO2 requires the multi-step MFA contract")
+        );
         server.verify().await;
     }
 
@@ -3682,9 +3721,10 @@ mod tests {
         .await
         .unwrap_err();
 
-        assert!(err
-            .to_string()
-            .contains("The legacy MFA contract does not support step start"));
+        assert!(
+            err.to_string()
+                .contains("The legacy MFA contract does not support step start")
+        );
         server.verify().await;
     }
 
@@ -3948,5 +3988,40 @@ mod tests {
 
         assert!(err.contains("session_expired"), "{err}");
         assert!(sessions_are_empty(&state));
+    }
+
+    #[test]
+    fn test_validate_external_link() {
+        assert!(validate_external_link("https://example.com/a").is_ok());
+        assert!(validate_external_link("http://localhost:8080/login").is_ok());
+        assert!(validate_external_link("http://127.0.0.1:8080/login").is_ok());
+        assert!(validate_external_link("http://[::1]:8080/login").is_ok());
+
+        assert!(validate_external_link("http://example.com").is_err());
+        assert!(validate_external_link("file:///etc/passwd").is_err());
+        assert!(validate_external_link("javascript:alert(1)").is_err());
+        assert!(validate_external_link("https://user:pass@example.com").is_err());
+    }
+
+    #[test]
+    fn test_fido2_pin_preserves_whitespace_and_enforces_bounds() {
+        use secrecy::ExposeSecret;
+        if pin_policy() == PinPolicy::Platform {
+            assert!(fido2_pin(None).unwrap().is_none());
+            return;
+        }
+        let spaced = fido2_pin(Some("  1234  ".into())).unwrap().unwrap();
+        assert_eq!(spaced.expose_secret(), "  1234  ");
+        assert!(fido2_pin(None).is_err());
+        assert!(fido2_pin(Some(String::new())).is_err());
+        assert!(fido2_pin(Some("a".repeat(64))).is_err());
+        assert_eq!(
+            fido2_pin(Some("a".repeat(63)))
+                .unwrap()
+                .unwrap()
+                .expose_secret()
+                .len(),
+            63
+        );
     }
 }

@@ -9,13 +9,13 @@ use windows_service::{
         PowerEventParam, ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState,
         ServiceStatus, ServiceType,
     },
-    service_control_handler::{register, ServiceControlHandlerResult},
+    service_control_handler::{ServiceControlHandlerResult, register},
     service_dispatcher,
 };
 
 use crate::{
     config::Config,
-    daemon::{run_server, DaemonError},
+    daemon::{DaemonError, run_server},
     service_locations::wake_reconciler,
     utils::logging_setup,
 };
@@ -108,41 +108,55 @@ fn run_service() -> Result<(), DaemonError> {
             std::process::exit(1);
         }));
 
+        let (grpc_shutdown_tx, grpc_shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+
         // Spawn the main gRPC server task
-        runtime.spawn(async move {
-            let result = run_server(config).await;
+        let server_handle = runtime.spawn(async move {
+            let result = run_server(config, grpc_shutdown_rx).await;
 
             let signal = if result.is_err() {
                 error!("Server task ended with error: {:?}", result.err());
                 2
             } else {
-                warn!("Server task ended without an error.");
+                warn!("Server task ended cleanly.");
                 1
             };
 
             let _ = shutdown_tx_server.send(signal);
         });
 
+        let mut exit_code = ServiceExitCode::Win32(0);
         loop {
             // Poll shutdown event.
             match shutdown_rx.recv_timeout(Duration::from_secs(1)) {
-                // Break the loop either upon stop or channel disconnect
-                Ok(1) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
-                Ok(2) => {
-                    panic!("Server has stopped working.")
+                // Break the loop upon stop or channel disconnect.
+                Ok(1) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    let _ = grpc_shutdown_tx.send(());
+                    break;
                 }
-                Ok(_) => break,
+                Ok(2) => {
+                    exit_code = ServiceExitCode::Win32(1);
+                    break;
+                }
+                Ok(_) => {
+                    let _ = grpc_shutdown_tx.send(());
+                    break;
+                }
 
                 // Continue work if no events were received within the timeout
                 Err(mpsc::RecvTimeoutError::Timeout) => (),
             }
         }
 
+        if exit_code == ServiceExitCode::Win32(0) {
+            let _ = runtime.block_on(tokio::time::timeout(Duration::from_secs(10), server_handle));
+        }
+
         status_handle.set_service_status(ServiceStatus {
             service_type: SERVICE_TYPE,
             current_state: ServiceState::Stopped,
             controls_accepted: ServiceControlAccept::empty(),
-            exit_code: ServiceExitCode::Win32(0),
+            exit_code,
             checkpoint: 0,
             wait_hint: Duration::default(),
             process_id: None,

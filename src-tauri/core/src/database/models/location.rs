@@ -2,19 +2,21 @@ use std::fmt;
 #[cfg(not(target_os = "macos"))]
 use std::str::FromStr;
 
+use serde::{Deserialize, Serialize};
+use sqlx::{SqliteExecutor, prelude::Type, query, query_as, query_scalar, types::Json};
 use xguard_wireguard_rs::net::IpAddrMask;
 #[cfg(not(target_os = "macos"))]
-use xguard_wireguard_rs::{key::Key, peer::Peer, InterfaceConfiguration};
-use serde::{Deserialize, Serialize};
-use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExecutor};
+use xguard_wireguard_rs::{InterfaceConfiguration, key::Key, peer::Peer};
 
 #[cfg(not(target_os = "macos"))]
 use super::wireguard_keys::WireguardKeys;
 use super::{Id, NoId};
+#[cfg(not(target_os = "macos"))]
+use crate::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6};
 use crate::{
     database::{
-        models::instance::{ClientTrafficPolicy, Instance},
         DbPool,
+        models::instance::{ClientTrafficPolicy, Instance},
     },
     error::Error,
     proto::client_types::{
@@ -22,8 +24,6 @@ use crate::{
         MfaStep as ProtoMfaStep, ServiceLocationMode as ProtoServiceLocationMode,
     },
 };
-#[cfg(not(target_os = "macos"))]
-use crate::{DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize, Type)]
 #[repr(u32)]
@@ -695,7 +695,8 @@ impl<I> Location<I> {
     /// go lower for their own network, but not higher.
     #[must_use]
     pub fn effective_mtu(&self, mtu: Option<u32>) -> Option<u32> {
-        match (mtu, self.client_mtu) {
+        let valid = |value: Option<u32>| value.filter(|v| (576..=9200).contains(v));
+        match (valid(mtu), valid(self.client_mtu)) {
             (Some(local), Some(server)) => Some(local.min(server)),
             (local, server) => local.or(server),
         }
@@ -800,10 +801,12 @@ mod tests {
         assert_eq!(found.instance_id, instance.id);
 
         location.delete(&pool).await.unwrap();
-        assert!(Location::find_by_id(&pool, location.id)
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            Location::find_by_id(&pool, location.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
@@ -837,6 +840,14 @@ mod tests {
         // ...and is used even when the core sent nothing.
         location.client_mtu = None;
         assert_eq!(location.effective_mtu(Some(1420)), Some(1420));
+
+        // Out-of-range values from either side are ignored.
+        location.client_mtu = Some(100);
+        assert_eq!(location.effective_mtu(Some(10_000)), None);
+        location.client_mtu = Some(1380);
+        assert_eq!(location.effective_mtu(Some(100)), Some(1380));
+        location.client_mtu = Some(10_000);
+        assert_eq!(location.effective_mtu(Some(1280)), Some(1280));
     }
 
     #[sqlx::test(migrations = "../migrations")]

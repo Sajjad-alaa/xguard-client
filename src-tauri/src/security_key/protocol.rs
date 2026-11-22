@@ -6,7 +6,7 @@
 //! its own origin (`xguard_core::fido2::client_data_json`). The two must stay byte-for-byte
 //! identical.
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use reqwest::Url;
 use serde_json::Value;
 
@@ -16,6 +16,12 @@ use super::Fido2Error;
 const MAX_CREDENTIAL_ID_LEN: usize = 1023;
 /// More credentials than any user registers; bounds what an Edge can make us send to the key.
 const MAX_CREDENTIALS: usize = 32;
+/// WebAuthn limit for `user.id`.
+const MAX_USER_ID_LEN: usize = 64;
+/// Bound user strings so CTAPHID payloads never truncate silently.
+const MAX_USER_NAME_LEN: usize = 256;
+/// Keep serialized allowList / excludeList comfortably within CTAPHID packet caps.
+const MAX_CREDENTIAL_LIST_BYTES: usize = 4096;
 /// Core issues 32-byte challenges (43 base64url characters).
 const MIN_CHALLENGE_LEN: usize = 16;
 const MAX_CHALLENGE_LEN: usize = 128;
@@ -55,17 +61,19 @@ pub struct RelyingParty {
 
 impl RelyingParty {
     pub fn for_instance(instance_url: &Url) -> Result<Self, Fido2Error> {
-        if !matches!(instance_url.scheme(), "https" | "http") {
-            return Err(Fido2Error::MalformedChallenge(
-                "the instance URL is not HTTP(S)".into(),
-            ));
-        }
         let id = instance_url
             .domain()
             .ok_or_else(|| {
                 Fido2Error::MalformedChallenge("the instance URL has no domain name".into())
             })?
             .to_owned();
+        let secure = instance_url.scheme() == "https"
+            || (instance_url.scheme() == "http" && id.eq_ignore_ascii_case("localhost"));
+        if !secure || !instance_url.username().is_empty() || instance_url.password().is_some() {
+            return Err(Fido2Error::MalformedChallenge(
+                "the instance URL is not trusted HTTP(S)".into(),
+            ));
+        }
         Ok(Self {
             id,
             origin: instance_url.origin().ascii_serialization(),
@@ -108,7 +116,17 @@ pub fn decode_credential_ids(ids: &[String]) -> Result<Vec<Vec<u8>>, Fido2Error>
             "too many credential IDs".into(),
         ));
     }
-    ids.iter().map(|id| decode_credential_id(id)).collect()
+    let decoded: Vec<Vec<u8>> = ids
+        .iter()
+        .map(|id| decode_credential_id(id))
+        .collect::<Result<_, _>>()?;
+    let total_bytes: usize = decoded.iter().map(Vec::len).sum();
+    if total_bytes > MAX_CREDENTIAL_LIST_BYTES {
+        return Err(Fido2Error::MalformedChallenge(
+            "credential list exceeds maximum size".into(),
+        ));
+    }
+    Ok(decoded)
 }
 
 /// What the key needs from WebAuthn creation options (`CreationChallengeResponse`).
@@ -148,8 +166,16 @@ pub fn parse_creation_options(
     let challenge = str_field(&value, "/publicKey/challenge")?;
     validate_challenge(challenge)?;
     let user_id = decode_credential_id(str_field(&value, "/publicKey/user/id")?)?;
+    if user_id.len() > MAX_USER_ID_LEN {
+        return Err(Fido2Error::MalformedChallenge("user ID is too long".into()));
+    }
     let user_name = str_field(&value, "/publicKey/user/name")?;
     let user_display_name = str_field(&value, "/publicKey/user/displayName")?;
+    if user_name.len() > MAX_USER_NAME_LEN || user_display_name.len() > MAX_USER_NAME_LEN {
+        return Err(Fido2Error::MalformedChallenge(
+            "user name exceeds maximum length".into(),
+        ));
+    }
     let es256 = value
         .pointer("/publicKey/pubKeyCredParams")
         .and_then(Value::as_array)
@@ -170,12 +196,21 @@ pub fn parse_creation_options(
         Some(credentials) if credentials.len() > MAX_CREDENTIALS => {
             return Err(Fido2Error::MalformedChallenge(
                 "too many excluded credentials".into(),
-            ))
+            ));
         }
-        Some(credentials) => credentials
-            .iter()
-            .map(|credential| decode_credential_id(str_field(credential, "/id")?))
-            .collect::<Result<_, _>>()?,
+        Some(credentials) => {
+            let decoded: Vec<Vec<u8>> = credentials
+                .iter()
+                .map(|credential| decode_credential_id(str_field(credential, "/id")?))
+                .collect::<Result<_, _>>()?;
+            let total_bytes: usize = decoded.iter().map(Vec::len).sum();
+            if total_bytes > MAX_CREDENTIAL_LIST_BYTES {
+                return Err(Fido2Error::MalformedChallenge(
+                    "excluded credentials exceed maximum size".into(),
+                ));
+            }
+            decoded
+        }
         None => Vec::new(),
     };
     Ok(CreationOptions {
@@ -311,6 +346,11 @@ mod tests {
                 .unwrap();
         assert_eq!(with_port.id, "vpn.example.com");
         assert_eq!(with_port.origin, "https://vpn.example.com:8443");
+        assert!(RelyingParty::for_instance(&Url::parse("http://localhost:8000/").unwrap()).is_ok());
+        assert!(RelyingParty::for_instance(&Url::parse("http://example.com/").unwrap()).is_err());
+        assert!(
+            RelyingParty::for_instance(&Url::parse("https://u:p@example.com/").unwrap()).is_err()
+        );
         assert!(RelyingParty::for_instance(&Url::parse("https://10.0.0.1/").unwrap()).is_err());
         assert!(RelyingParty::for_instance(&Url::parse("ftp://example.com/").unwrap()).is_err());
     }
@@ -333,6 +373,7 @@ mod tests {
         assert!(decode_credential_ids(&["not base64!".into()]).is_err());
         assert!(decode_credential_ids(&[URL_SAFE_NO_PAD.encode([0u8; 1024])]).is_err());
         assert!(decode_credential_ids(&vec!["AQID".to_string(); 33]).is_err());
+        assert!(decode_credential_ids(&vec![URL_SAFE_NO_PAD.encode([0u8; 512]); 9]).is_err());
     }
 
     fn options(rp_id: &str) -> String {

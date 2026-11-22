@@ -2,14 +2,14 @@
 use std::os::unix::fs::PermissionsExt;
 use std::{
     fmt,
-    fs::{create_dir_all, OpenOptions},
+    fs::{OpenOptions, create_dir_all},
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
     time::Duration,
 };
 
-use clap::{builder::FalseyValueParser, command, value_parser, Arg, Command};
+use clap::{Arg, Command, builder::FalseyValueParser, command, value_parser};
 use common::{dns_borrow, find_free_tcp_port, get_interface_name};
 use proto::xguard::client_types::{
     Device, DeviceConfig, DeviceConfigResponse, EnrollmentStartRequest, EnrollmentStartResponse,
@@ -19,7 +19,7 @@ use reqwest::{Client, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 #[cfg(unix)]
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 #[cfg(not(unix))]
 use tokio::time::sleep;
 use tokio::{select, signal::ctrl_c, sync::Notify, time::interval};
@@ -31,8 +31,8 @@ use xguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
 use xguard_wireguard_rs::Userspace;
 use xguard_wireguard_rs::{
-    error::WireguardInterfaceError, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
-    WGApi, WireguardInterfaceApi,
+    InterfaceConfiguration, WGApi, WireguardInterfaceApi, error::WireguardInterfaceError, key::Key,
+    net::IpAddrMask, peer::Peer,
 };
 
 mod proto {
@@ -67,7 +67,7 @@ impl fmt::Debug for CliConfig {
             .field("device", &self.device)
             .field("device_config", &self.device_config)
             .field("instance_info", &self.instance_info)
-            .field("token", &self.token)
+            .field("token", &self.token.as_ref().map(|_| "<HIDDEN>"))
             .finish()
     }
 }
@@ -382,6 +382,41 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
 const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
+const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+
+fn poll_endpoint_url(proxy_url: &str) -> Result<Url, CliError> {
+    let mut url = Url::parse(proxy_url)
+        .map_err(|err| CliError::XGuardApi(format!("Invalid proxy URL ({proxy_url}): {err}")))?;
+    let loopback = match url.host_str() {
+        Some(host) => {
+            host.eq_ignore_ascii_case("localhost")
+                || host
+                    .trim_start_matches('[')
+                    .trim_end_matches(']')
+                    .parse::<std::net::IpAddr>()
+                    .is_ok_and(|ip| ip.is_loopback())
+        }
+        None => {
+            return Err(CliError::XGuardApi(format!(
+                "Proxy URL missing host: {proxy_url}"
+            )));
+        }
+    };
+    let secure = url.scheme() == "https" || (url.scheme() == "http" && loopback);
+    if !secure || !url.username().is_empty() || url.password().is_some() {
+        return Err(CliError::XGuardApi(format!(
+            "Refusing unsafe proxy URL: {proxy_url}"
+        )));
+    }
+    url.set_query(None);
+    url.set_fragment(None);
+    if !url.path().ends_with('/') {
+        let path = format!("{}/", url.path());
+        url.set_path(&path);
+    }
+    url.join("api/v1/poll")
+        .map_err(|err| CliError::XGuardApi(format!("Failed to build poll URL: {err}")))
+}
 
 /// Fetch configuration from XGuard proxy. Returns `None` when it is unchanged since `revision`,
 /// which is updated from the response.
@@ -391,7 +426,7 @@ async fn fetch_config(
     token: String,
     revision: &mut Option<String>,
 ) -> Result<Option<DeviceConfig>, CliError> {
-    let result = client
+    let mut result = client
         .post(url.clone())
         .json(&InstanceInfoRequest {
             token,
@@ -402,7 +437,25 @@ async fn fetch_config(
         .await?;
 
     let instance_response: InstanceInfoResponse = if result.status() == StatusCode::OK {
-        result.json().await?
+        if result
+            .content_length()
+            .is_some_and(|length| length > MAX_RESPONSE_BYTES as u64)
+        {
+            return Err(CliError::XGuardApi(
+                "Configuration polling response exceeded size limit.".into(),
+            ));
+        }
+        let mut body = Vec::new();
+        while let Some(chunk) = result.chunk().await? {
+            if body.len() + chunk.len() > MAX_RESPONSE_BYTES {
+                return Err(CliError::XGuardApi(
+                    "Configuration polling response exceeded size limit.".into(),
+                ));
+            }
+            body.extend_from_slice(&chunk);
+        }
+        serde_json::from_slice(&body)
+            .map_err(|err| CliError::XGuardApi(format!("Invalid JSON response: {err}")))?
     } else if result.status() == StatusCode::TOO_MANY_REQUESTS {
         return Err(CliError::XGuardApi("polling too often".into()));
     } else if matches!(
@@ -420,7 +473,9 @@ async fn fetch_config(
     };
 
     if instance_response.not_modified == Some(true) {
-        *revision = instance_response.config_revision;
+        if instance_response.config_revision.is_some() {
+            *revision = instance_response.config_revision;
+        }
         return Ok(None);
     }
     let new_revision = instance_response.config_revision.clone();
@@ -447,7 +502,9 @@ async fn fetch_config(
         // This should not happen.
         return Err(CliError::MissingData);
     };
-    *revision = new_revision;
+    if new_revision.is_some() {
+        *revision = new_revision;
+    }
 
     Ok(Some(device_config))
 }
@@ -476,17 +533,13 @@ async fn poll_config(config: &mut CliConfig) {
             return;
         }
     };
-    let mut url = match Url::parse(&config.instance_info.proxy_url) {
+    let url = match poll_endpoint_url(&config.instance_info.proxy_url) {
         Ok(url) => url,
         Err(err) => {
-            error!(
-                "Failed to parse proxy URL ({}) for config polling: {err}",
-                &config.instance_info.proxy_url
-            );
+            error!("Refusing config polling URL: {err}");
             return;
         }
     };
-    url.set_path("/api/v1/poll");
     debug!("Config polling setup done, starting the polling loop.");
     let mut interval = interval(INTERVAL_SECONDS);
     let mut revision = None;

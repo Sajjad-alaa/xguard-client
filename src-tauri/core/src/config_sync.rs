@@ -22,19 +22,19 @@ use std::{
     time::Duration,
 };
 
-use reqwest::{redirect::Policy, Client, StatusCode, Url};
+use reqwest::{Client, StatusCode, Url, redirect::Policy};
 
 use crate::{
     database::{
+        DbPool,
         models::{
+            Id,
             instance::Instance,
             location::{Location, LocationMfaMode},
-            Id,
         },
-        DbPool,
     },
     error::Error,
-    instance_sync::{apply_device_config, SyncSummary},
+    instance_sync::{SyncSummary, apply_device_config},
     proto::client_types::{DeviceConfigResponse, InstanceInfoRequest, InstanceInfoResponse},
     proxy::construct_platform_header,
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
@@ -427,6 +427,8 @@ pub struct SyncReport {
     pub summary: Option<SyncSummary>,
     pub actions: Vec<TunnelAction>,
     pub interval: Option<Duration>,
+    /// Post-commit locations for re-planning after checking live tunnel state.
+    pub after_locations: HashMap<Id, Location<Id>>,
 }
 
 impl SyncReport {
@@ -471,8 +473,10 @@ pub async fn sync_instance(
         PollOutcome::Changed(config) => config,
     };
 
-    let mut instance = instance;
     let mut transaction = pool.begin().await?;
+    let Some(mut instance) = Instance::find_by_id(&mut *transaction, instance_id).await? else {
+        return Err(SyncError::NotFound(instance_id));
+    };
     let summary = apply_device_config(&mut transaction, &mut instance, *config).await?;
     let after: HashMap<Id, Location<Id>> =
         Location::find_by_instance_id(&mut *transaction, instance_id, true)
@@ -481,6 +485,7 @@ pub async fn sync_instance(
             .map(|location| (location.id, location))
             .collect();
     transaction.commit().await?;
+    report.instance_name = instance.name;
     match poll.revision {
         Some(revision) => {
             revisions().insert(instance_id, revision);
@@ -489,6 +494,7 @@ pub async fn sync_instance(
     }
 
     report.actions = plan_tunnel_actions(&summary, active, &after);
+    report.after_locations = after;
     report.summary = Some(summary);
     Ok(report)
 }

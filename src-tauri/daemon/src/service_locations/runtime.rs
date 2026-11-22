@@ -5,15 +5,15 @@ use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 use tokio::sync::{Mutex, Notify};
 use tracing::{debug, error, info, warn};
 use xguard_wireguard_rs::{
-    key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WireguardInterfaceApi,
+    InterfaceConfiguration, WireguardInterfaceApi, key::Key, net::IpAddrMask, peer::Peer,
 };
 
 use super::{
-    reconciler::{desired_tunnels, interface_name, plan, Action, DesiredTunnel, TunnelKey},
+    reconciler::{Action, DesiredTunnel, TunnelKey, desired_tunnels, interface_name, plan},
     session::user_signed_in,
     store::{Store, StoredInstance},
 };
-use crate::daemon::{configure_interface, setup_wgapi, WG};
+use crate::daemon::{WG, configure_interface, setup_wgapi};
 
 /// How often the reconciler runs without being woken. It also retries tunnels whose endpoint
 /// did not resolve yet (for example before the network is up at boot).
@@ -96,6 +96,8 @@ impl ServiceLocationManager {
             .map_err(|err| format!("create {ifname}: {err}"))?;
         let dns = tunnel.location.dns.clone();
         if let Err(status) = configure_interface(&ifname, &dns, &mut wgapi, &mut config) {
+            #[cfg(not(windows))]
+            let _ = wgapi.remove_endpoint_routing(&tunnel.location.endpoint);
             let _ = wgapi.remove_interface();
             return Err(status.message().to_owned());
         }

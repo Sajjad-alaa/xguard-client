@@ -154,16 +154,11 @@ pub fn parse_provisioning(
     })
 }
 
-/// Checks that only the right account can have written the file (and, for user files, that
-/// nobody else can read it).
-#[cfg(unix)]
-pub fn check_permissions(path: &Path, scope: Scope) -> Result<(), ProvisioningError> {
-    use std::os::unix::fs::{MetadataExt, PermissionsExt};
-
-    let metadata = fs::symlink_metadata(path).map_err(|err| match err.kind() {
-        std::io::ErrorKind::NotFound => ProvisioningError::NotFound,
-        _ => ProvisioningError::Unreadable(err.to_string()),
-    })?;
+fn check_file_metadata(
+    metadata: &fs::Metadata,
+    parent_meta: &fs::Metadata,
+    scope: Scope,
+) -> Result<(), ProvisioningError> {
     if !metadata.file_type().is_file() {
         return Err(ProvisioningError::Insecure(
             "not a regular file (links are not followed)".into(),
@@ -172,62 +167,82 @@ pub fn check_permissions(path: &Path, scope: Scope) -> Result<(), ProvisioningEr
     if metadata.len() > MAX_FILE_SIZE {
         return Err(ProvisioningError::TooLarge);
     }
-    let mode = metadata.permissions().mode();
-    match scope {
-        Scope::User => {
-            let uid = nix::unistd::geteuid().as_raw();
-            if metadata.uid() != uid {
-                return Err(ProvisioningError::Insecure("owned by another user".into()));
-            }
-            if mode & 0o077 != 0 {
-                return Err(ProvisioningError::Insecure(format!(
-                    "mode {:o} lets group or others access it; use 600",
-                    mode & 0o777
-                )));
-            }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+        if !parent_meta.file_type().is_dir() {
+            return Err(ProvisioningError::Insecure(
+                "parent directory is not a real directory".into(),
+            ));
         }
-        Scope::System => {
-            if metadata.uid() != 0 {
-                return Err(ProvisioningError::Insecure("not owned by root".into()));
+        let mode = metadata.permissions().mode();
+        match scope {
+            Scope::User => {
+                let uid = nix::unistd::geteuid().as_raw();
+                if metadata.uid() != uid {
+                    return Err(ProvisioningError::Insecure("owned by another user".into()));
+                }
+                if mode & 0o077 != 0 {
+                    return Err(ProvisioningError::Insecure(format!(
+                        "mode {:o} lets group or others access it; use 600",
+                        mode & 0o777
+                    )));
+                }
             }
-            if mode & 0o022 != 0 {
-                return Err(ProvisioningError::Insecure(format!(
-                    "mode {:o} lets group or others write it",
-                    mode & 0o777
-                )));
-            }
-            let parent = path
-                .parent()
-                .ok_or_else(|| ProvisioningError::Insecure("no parent directory".into()))?;
-            let dir = fs::metadata(parent)
-                .map_err(|err| ProvisioningError::Unreadable(err.to_string()))?;
-            if dir.uid() != 0 || dir.permissions().mode() & 0o022 != 0 {
-                return Err(ProvisioningError::Insecure(
-                    "its directory is not root-owned or is writable by others".into(),
-                ));
+            Scope::System => {
+                if metadata.uid() != 0 {
+                    return Err(ProvisioningError::Insecure("not owned by root".into()));
+                }
+                if mode & 0o022 != 0 {
+                    return Err(ProvisioningError::Insecure(format!(
+                        "mode {:o} lets group or others write it",
+                        mode & 0o777
+                    )));
+                }
+                if parent_meta.uid() != 0 || parent_meta.permissions().mode() & 0o022 != 0 {
+                    return Err(ProvisioningError::Insecure(
+                        "its directory is not root-owned or is writable by others".into(),
+                    ));
+                }
             }
         }
     }
+    #[cfg(not(unix))]
+    let _ = (parent_meta, scope);
     Ok(())
+}
+
+/// Checks that only the right account can have written the file (and, for user files, that
+/// nobody else can read it).
+#[cfg(unix)]
+pub fn check_permissions(path: &Path, scope: Scope) -> Result<(), ProvisioningError> {
+    let metadata = fs::symlink_metadata(path).map_err(|err| match err.kind() {
+        std::io::ErrorKind::NotFound => ProvisioningError::NotFound,
+        _ => ProvisioningError::Unreadable(err.to_string()),
+    })?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| ProvisioningError::Insecure("no parent directory".into()))?;
+    let parent_meta = fs::symlink_metadata(parent)
+        .map_err(|err| ProvisioningError::Unreadable(err.to_string()))?;
+    check_file_metadata(&metadata, &parent_meta, scope)
 }
 
 /// Windows: refuses links and oversized files. Write access is governed by the directory's ACL
 /// (system files are only looked for under `%ProgramFiles%`, user files in the user's profile).
 #[cfg(windows)]
-pub fn check_permissions(path: &Path, _scope: Scope) -> Result<(), ProvisioningError> {
+pub fn check_permissions(path: &Path, scope: Scope) -> Result<(), ProvisioningError> {
     let metadata = fs::symlink_metadata(path).map_err(|err| match err.kind() {
         std::io::ErrorKind::NotFound => ProvisioningError::NotFound,
         _ => ProvisioningError::Unreadable(err.to_string()),
     })?;
-    if !metadata.file_type().is_file() {
-        return Err(ProvisioningError::Insecure(
-            "not a regular file (links are not followed)".into(),
-        ));
-    }
-    if metadata.len() > MAX_FILE_SIZE {
-        return Err(ProvisioningError::TooLarge);
-    }
-    Ok(())
+    let parent = path
+        .parent()
+        .ok_or_else(|| ProvisioningError::Insecure("no parent directory".into()))?;
+    let parent_meta = fs::symlink_metadata(parent)
+        .map_err(|err| ProvisioningError::Unreadable(err.to_string()))?;
+    check_file_metadata(&metadata, &parent_meta, scope)
 }
 
 /// Reads and validates the file at `path`.
@@ -236,10 +251,50 @@ pub fn read_provisioning(
     scope: Scope,
     now: DateTime<Utc>,
 ) -> Result<ProvisioningConfig, ProvisioningError> {
-    check_permissions(path, scope)?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| ProvisioningError::Insecure("no parent directory".into()))?;
+    let parent_meta = fs::symlink_metadata(parent).map_err(|err| match err.kind() {
+        std::io::ErrorKind::NotFound => ProvisioningError::NotFound,
+        _ => ProvisioningError::Unreadable(err.to_string()),
+    })?;
+    #[cfg(unix)]
+    let file = {
+        use std::os::unix::fs::OpenOptionsExt;
+
+        let sym_meta = fs::symlink_metadata(path).map_err(|err| match err.kind() {
+            std::io::ErrorKind::NotFound => ProvisioningError::NotFound,
+            _ => ProvisioningError::Unreadable(err.to_string()),
+        })?;
+        if !sym_meta.file_type().is_file() {
+            return Err(ProvisioningError::Insecure(
+                "not a regular file (links are not followed)".into(),
+            ));
+        }
+        fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_NONBLOCK)
+            .open(path)
+            .map_err(|err| match err.kind() {
+                std::io::ErrorKind::NotFound => ProvisioningError::NotFound,
+                _ if err.raw_os_error() == Some(nix::libc::ELOOP) => ProvisioningError::Insecure(
+                    "not a regular file (links are not followed)".into(),
+                ),
+                _ => ProvisioningError::Unreadable(err.to_string()),
+            })?
+    };
+    #[cfg(not(unix))]
+    let file = {
+        check_permissions(path, scope)?;
+        fs::File::open(path).map_err(|err| ProvisioningError::Unreadable(err.to_string()))?
+    };
+    let metadata = file
+        .metadata()
+        .map_err(|err| ProvisioningError::Unreadable(err.to_string()))?;
+    check_file_metadata(&metadata, &parent_meta, scope)?;
     let mut content = String::new();
-    fs::File::open(path)
-        .and_then(|file| file.take(MAX_FILE_SIZE + 1).read_to_string(&mut content))
+    file.take(MAX_FILE_SIZE + 1)
+        .read_to_string(&mut content)
         .map_err(|err| ProvisioningError::Unreadable(err.to_string()))?;
     if content.len() as u64 > MAX_FILE_SIZE {
         return Err(ProvisioningError::TooLarge);
@@ -264,10 +319,16 @@ pub fn system_path() -> Option<PathBuf> {
         let exe = std::env::current_exe().ok()?;
         let dir = exe.parent()?;
         let program_files = std::env::var_os("ProgramFiles").map(PathBuf::from)?;
-        let lower = |p: &Path| p.to_string_lossy().to_lowercase();
-        lower(dir)
-            .starts_with(&lower(&program_files))
-            .then(|| dir.join(PROVISIONING_FILE_NAME))
+        let pf_parts: Vec<_> = program_files.components().collect();
+        let dir_parts: Vec<_> = dir.components().collect();
+        let under_program_files = !pf_parts.is_empty()
+            && dir_parts.len() >= pf_parts.len()
+            && pf_parts.iter().zip(&dir_parts).all(|(a, b)| {
+                a.as_os_str()
+                    .to_string_lossy()
+                    .eq_ignore_ascii_case(&b.as_os_str().to_string_lossy())
+            });
+        under_program_files.then(|| dir.join(PROVISIONING_FILE_NAME))
     }
     #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
     {
@@ -335,12 +396,27 @@ pub fn mark_consumed(app_data_dir: &Path, found: &FoundProvisioning) {
         consumed.push(found.config.enrollment_token.clone());
         // Keep the list short: old tokens are long expired.
         let start = consumed.len().saturating_sub(16);
+        let payload = consumed[start..].join("\n");
         let path = app_data_dir.join(CONSUMED_FILE_NAME);
-        if let Err(err) = fs::write(&path, consumed[start..].join("\n")) {
+        let tmp = app_data_dir.join(format!("{CONSUMED_FILE_NAME}.tmp.{}", std::process::id()));
+        let _ = fs::remove_file(&tmp);
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let write_result = options.open(&tmp).and_then(|mut file| {
+            use std::io::Write;
+            file.write_all(payload.as_bytes())?;
+            file.sync_all()?;
+            fs::rename(&tmp, &path)
+        });
+        if let Err(err) = write_result {
+            let _ = fs::remove_file(&tmp);
             warn!("Failed to record the used provisioning token: {err}");
         }
-        #[cfg(unix)]
-        crate::set_perms(&path);
     }
     if found.scope == Scope::User {
         match fs::remove_file(&found.path) {

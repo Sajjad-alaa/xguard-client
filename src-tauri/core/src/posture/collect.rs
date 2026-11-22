@@ -22,10 +22,11 @@ pub(crate) async fn run(program: &'static str, args: &'static [&'static str]) ->
 }
 
 pub(crate) async fn run_with_timeout(
-    program: &'static str,
+    program: impl AsRef<std::ffi::OsStr>,
     args: &'static [&'static str],
     limit: Duration,
 ) -> Option<String> {
+    let program = program.as_ref();
     let mut command = Command::new(program);
     command
         .args(args)
@@ -44,20 +45,35 @@ pub(crate) async fn run_with_timeout(
     let work = async {
         let mut out = Vec::new();
         let mut err = Vec::new();
-        let mut stdout = (&mut stdout).take(MAX_OUTPUT);
-        let mut stderr = (&mut stderr).take(MAX_OUTPUT);
-        let (read_out, read_err) =
-            tokio::join!(stdout.read_to_end(&mut out), stderr.read_to_end(&mut err),);
+        let cap = MAX_OUTPUT + 1;
+        let mut out_reader = (&mut stdout).take(cap);
+        let mut err_reader = (&mut stderr).take(cap);
+        let (read_out, read_err) = tokio::join!(
+            out_reader.read_to_end(&mut out),
+            err_reader.read_to_end(&mut err),
+        );
+        drop((out_reader, err_reader));
         read_out.ok()?;
         read_err.ok()?;
+        if out.len() as u64 > MAX_OUTPUT || err.len() as u64 > MAX_OUTPUT {
+            drop((stdout, stderr));
+            let _ = child.start_kill();
+            let _ = child.wait().await;
+            return None;
+        }
         child.wait().await.ok()?;
-        out.extend_from_slice(&err);
+        if !err.is_empty() {
+            if !out.is_empty() && !out.ends_with(b"\n") {
+                out.push(b'\n');
+            }
+            out.extend_from_slice(&err);
+        }
         Some(String::from_utf8_lossy(&out).into_owned())
     };
     match timeout(limit, work).await {
         Ok(output) => output,
         Err(_) => {
-            debug!("Posture probe {program} timed out");
+            debug!("Posture probe {program:?} timed out");
             None
         }
     }
@@ -78,11 +94,15 @@ pub(crate) struct PlatformFacts {
 
 #[cfg(target_os = "linux")]
 pub(crate) async fn platform_facts() -> PlatformFacts {
-    use std::{fs, path::PathBuf};
+    use std::{
+        fs,
+        os::unix::fs::MetadataExt,
+        path::{Path, PathBuf},
+    };
 
     use super::parse;
 
-    fn read(path: &str) -> Option<String> {
+    fn read(path: &Path) -> Option<String> {
         use std::io::Read;
         let mut text = String::new();
         fs::File::open(path)
@@ -94,7 +114,7 @@ pub(crate) async fn platform_facts() -> PlatformFacts {
     }
 
     fn disk_encrypted() -> Option<bool> {
-        let (major, minor, source) = parse::root_mount(&read("/proc/self/mountinfo")?)?;
+        let (major, minor, source) = parse::root_mount(&read(Path::new("/proc/self/mountinfo"))?)?;
         let block = if major == 0 {
             // btrfs and similar report a virtual device; use the mount source instead.
             let device = fs::canonicalize(&source).ok()?;
@@ -109,23 +129,19 @@ pub(crate) async fn platform_facts() -> PlatformFacts {
         let Ok(entries) = fs::read_dir("/proc") else {
             return false;
         };
-        entries
-            .flatten()
-            .filter(|e| {
-                e.file_name()
-                    .to_string_lossy()
-                    .bytes()
-                    .all(|b| b.is_ascii_digit())
-            })
-            .take(4096)
-            .any(|e| {
-                fs::read_to_string(e.path().join("comm"))
+        entries.flatten().any(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .bytes()
+                .all(|b| b.is_ascii_digit())
+                && fs::metadata(e.path()).is_ok_and(|meta| meta.uid() == 0)
+                && fs::read_to_string(e.path().join("comm"))
                     .is_ok_and(|comm| comm.trim() == "firewalld")
-            })
+        })
     }
 
     fn firewall_enabled() -> Option<bool> {
-        let ufw = read("/etc/ufw/ufw.conf").and_then(|conf| parse::ufw_enabled(&conf));
+        let ufw = read(Path::new("/etc/ufw/ufw.conf")).and_then(|conf| parse::ufw_enabled(&conf));
         let nftables = [
             "/etc/systemd/system/multi-user.target.wants/nftables.service",
             "/etc/systemd/system/sysinit.target.wants/nftables.service",
@@ -145,20 +161,26 @@ pub(crate) async fn platform_facts() -> PlatformFacts {
             .to_ascii_lowercase();
         if desktop.contains("kde") {
             let path = dirs_next::config_dir()?.join("kscreenlockerrc");
-            return Some(parse::kde_autolock(
-                fs::read_to_string(path).ok().as_deref(),
-            ));
+            return parse::kde_autolock(read(&path).as_deref());
         }
         let output = run(
             "/usr/bin/gsettings",
             &["get", "org.gnome.desktop.screensaver", "lock-enabled"],
         )
         .await?;
-        parse::gsettings_bool(&output)
+        if !parse::gsettings_bool(&output)? {
+            return Some(false);
+        }
+        let idle = run(
+            "/usr/bin/gsettings",
+            &["get", "org.gnome.desktop.session", "idle-delay"],
+        )
+        .await?;
+        parse::gnome_idle_delay_nonzero(&idle)
     }
 
     PlatformFacts {
-        kernel_version: read("/proc/sys/kernel/osrelease").map(|v| v.trim().to_string()),
+        kernel_version: read(Path::new("/proc/sys/kernel/osrelease")).map(|v| v.trim().to_string()),
         disk_encrypted: disk_encrypted(),
         firewall_enabled: firewall_enabled(),
         screen_lock_enabled: screen_lock_enabled().await,
@@ -218,9 +240,13 @@ if ($h) { "update_age_days=$([int]((Get-Date) - $h.InstalledOn).TotalDays)" }
 
 #[cfg(windows)]
 pub(crate) async fn platform_facts() -> PlatformFacts {
+    use std::path::PathBuf;
+
     use super::parse;
 
-    const POWERSHELL: &str = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
+    let system_root = std::env::var_os("SystemRoot").unwrap_or_else(|| r"C:\Windows".into());
+    let powershell =
+        PathBuf::from(system_root).join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
     static ARGS: [&str; 6] = [
         "-NoProfile",
         "-NonInteractive",
@@ -229,7 +255,7 @@ pub(crate) async fn platform_facts() -> PlatformFacts {
         "-Command",
         WINDOWS_SCRIPT,
     ];
-    let report = run_with_timeout(POWERSHELL, &ARGS, Duration::from_secs(15))
+    let report = run_with_timeout(&powershell, &ARGS, Duration::from_secs(15))
         .await
         .unwrap_or_default();
     let report = parse::windows_report(&report);

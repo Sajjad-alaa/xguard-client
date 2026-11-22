@@ -20,10 +20,10 @@ use xguard_client_proto::xguard::client::v1::{
 };
 
 use crate::database::models::{
-    instance::Instance,
+    Id,
+    instance::{ClientTrafficPolicy, Instance},
     location::{Location, LocationMfaMode, ServiceLocationMode},
     wireguard_keys::WireguardKeys,
-    Id,
 };
 #[cfg(not(target_os = "macos"))]
 use crate::{database::DbPool, error::Error};
@@ -38,7 +38,11 @@ pub fn is_daemon_service_location<I>(location: &Location<I>) -> bool {
 
 /// The service locations of an instance, in a stable order.
 #[must_use]
-pub fn daemon_service_locations(locations: &[Location<Id>]) -> Vec<ServiceLocation> {
+pub fn daemon_service_locations(
+    locations: &[Location<Id>],
+    traffic_policy: &ClientTrafficPolicy,
+) -> Vec<ServiceLocation> {
+    let forced_all = *traffic_policy == ClientTrafficPolicy::ForceAllTraffic;
     let mut service: Vec<ServiceLocation> = locations
         .iter()
         .filter(|location| is_daemon_service_location(location))
@@ -47,7 +51,15 @@ pub fn daemon_service_locations(locations: &[Location<Id>]) -> Vec<ServiceLocati
             address: location.address.clone(),
             pubkey: location.pubkey.clone(),
             endpoint: location.endpoint.clone(),
-            allowed_ips: location.allowed_ips.clone(),
+            allowed_ips: if forced_all {
+                format!(
+                    "{}, {}",
+                    crate::DEFAULT_ROUTE_IPV4,
+                    crate::DEFAULT_ROUTE_IPV6
+                )
+            } else {
+                location.allowed_ips.clone()
+            },
             keepalive_interval: u32::try_from(location.keepalive_interval.clamp(0, 3600))
                 .unwrap_or(25),
             dns: location.dns.clone().unwrap_or_default(),
@@ -108,7 +120,7 @@ pub async fn sync_service_locations(pool: &DbPool, instance: &Instance<Id>) -> R
     use crate::connection::daemon_client::DAEMON_CLIENT;
 
     let locations = Location::find_by_instance_id(pool, instance.id, true).await?;
-    let service = daemon_service_locations(&locations);
+    let service = daemon_service_locations(&locations, &instance.client_traffic_policy);
     if service.is_empty() {
         if last_pushed().get(&instance.uuid) == Some(&None) {
             return Ok(false);
@@ -214,13 +226,27 @@ mod tests {
             location(3, ServiceLocationMode::AlwaysOn, LocationMfaMode::Internal),
             posture,
         ];
-        let service = daemon_service_locations(&locations);
+        let service = daemon_service_locations(&locations, &ClientTrafficPolicy::None);
         let ids: Vec<_> = service.iter().map(|l| l.core_location_id).collect();
         assert_eq!(ids, [1, 4]);
         assert_eq!(service[0].mode, DaemonMode::PreLogon as i32);
         assert_eq!(service[1].mode, DaemonMode::AlwaysOn as i32);
         assert_eq!(service[1].mtu, Some(1380));
         assert_eq!(service[1].dns, "10.0.0.53");
+    }
+
+    #[test]
+    fn force_all_traffic_overrides_allowed_ips() {
+        let locations = vec![location(
+            1,
+            ServiceLocationMode::AlwaysOn,
+            LocationMfaMode::Disabled,
+        )];
+        let forced = daemon_service_locations(&locations, &ClientTrafficPolicy::ForceAllTraffic);
+        assert_eq!(forced[0].allowed_ips, "0.0.0.0/0, ::/0");
+
+        let normal = daemon_service_locations(&locations, &ClientTrafficPolicy::None);
+        assert_eq!(normal[0].allowed_ips, "10.0.0.0/24");
     }
 
     #[sqlx::test(migrations = "../migrations")]
@@ -239,11 +265,14 @@ mod tests {
             pubkey: "device-pub".into(),
             prvkey: "device-prv".into(),
         };
-        let service = daemon_service_locations(&[location(
-            1,
-            ServiceLocationMode::AlwaysOn,
-            LocationMfaMode::Disabled,
-        )]);
+        let service = daemon_service_locations(
+            &[location(
+                1,
+                ServiceLocationMode::AlwaysOn,
+                LocationMfaMode::Disabled,
+            )],
+            &ClientTrafficPolicy::None,
+        );
         let request = save_request(&instance, &keys, service.clone());
         assert!(request.token.is_none());
         assert_eq!(request.instance_id, instance.uuid);

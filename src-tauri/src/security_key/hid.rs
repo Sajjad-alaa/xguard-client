@@ -5,21 +5,25 @@
 //! the canonical client data itself and the key signs `SHA-256(clientData)` as WebAuthn expects.
 
 use ctap_hid_fido2::{
+    FidoKeyHid, FidoKeyHidFactory, LibCfg,
     fidokey::{GetAssertionArgsBuilder, MakeCredentialArgsBuilder},
     public_key_credential_user_entity::PublicKeyCredentialUserEntity,
-    FidoKeyHid, FidoKeyHidFactory, LibCfg,
 };
 
 use super::{
-    protocol::{map_device_error, CreationOptions},
     Assertion, Fido2Error,
+    protocol::{CreationOptions, map_device_error},
 };
 
 fn open_key() -> Result<FidoKeyHid, Fido2Error> {
     let mut cfg = LibCfg::init();
     // The library would print "touch the sensor" to stdout; the UI shows its own prompt.
     cfg.enable_keep_alive_msg = false;
-    FidoKeyHidFactory::create(&cfg).map_err(|err| map_device_error(&err.to_string()))
+    let mut key =
+        FidoKeyHidFactory::create(&cfg).map_err(|err| map_device_error(&err.to_string()))?;
+    key.set_pin_uv_auth_protocol_two()
+        .map_err(|err| map_device_error(&err.to_string()))?;
+    Ok(key)
 }
 
 /// Signs `client_data` with one of `credential_ids` for `rp_id`, with the PIN (user
@@ -80,6 +84,9 @@ pub(super) fn make_credential(
     let attestation = key
         .make_credential_with_args(&args.build())
         .map_err(|err| map_device_error(&err.to_string()))?;
+    if !attestation.flags.user_present_result || !attestation.flags.user_verified_result {
+        return Err(Fido2Error::NotAllowed);
+    }
     if attestation.credential_descriptor.id.is_empty() || attestation.auth_data.is_empty() {
         return Err(Fido2Error::Device(
             "the key returned no credential".to_owned(),
