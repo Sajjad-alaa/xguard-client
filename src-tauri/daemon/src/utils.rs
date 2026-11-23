@@ -10,8 +10,8 @@ use tracing_appender::{
     rolling::{InitError, RollingFileAppender, Rotation},
 };
 use tracing_subscriber::{
-    fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
-    Layer,
+    EnvFilter, Layer, fmt, fmt::writer::MakeWriterExt, layer::SubscriberExt,
+    util::SubscriberInitExt,
 };
 
 const SERVICE_LOG_PREFIX: &str = "xguard-service";
@@ -30,7 +30,29 @@ pub fn logging_setup(
     log_level: &str,
     log_max_files: usize,
 ) -> Result<WorkerGuard, LoggingSetupError> {
-    migrate_service_log_files(Path::new(log_dir)).map_err(LoggingSetupError::Migration)?;
+    let dir = Path::new(log_dir);
+    match fs::symlink_metadata(dir) {
+        Ok(meta) => {
+            if meta.file_type().is_symlink() || !meta.file_type().is_dir() {
+                return Err(LoggingSetupError::Migration(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "log directory cannot be a symlink or non-directory",
+                )));
+            }
+        }
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            fs::create_dir_all(dir).map_err(LoggingSetupError::Migration)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(dir, fs::Permissions::from_mode(0o700))
+                    .map_err(LoggingSetupError::Migration)?;
+            }
+        }
+        Err(err) => return Err(LoggingSetupError::Migration(err)),
+    }
+
+    migrate_service_log_files(dir).map_err(LoggingSetupError::Migration)?;
 
     // prepare log file appender
     let mut appender_builder = RollingFileAppender::builder()

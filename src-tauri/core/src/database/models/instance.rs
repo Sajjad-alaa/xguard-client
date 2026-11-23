@@ -17,6 +17,7 @@ pub struct Instance<I = NoId> {
     pub url: String,
     pub proxy_url: String,
     pub username: String,
+    #[serde(default, skip_serializing)]
     pub token: Option<String>,
     pub client_traffic_policy: ClientTrafficPolicy,
     pub enterprise_enabled: bool,
@@ -1123,5 +1124,12 @@ mod tests {
             .expect("instance should exist");
         assert_eq!(persisted.smtp_configured, None);
         assert_eq!(persisted.openid_available, Some(false));
+    }
+
+    #[test]
+    fn test_instance_serialization_omits_token() {
+        let instance = new_instance();
+        let json = serde_json::to_value(&instance).expect("instance serializes");
+        assert!(json.get("token").is_none());
     }
 }

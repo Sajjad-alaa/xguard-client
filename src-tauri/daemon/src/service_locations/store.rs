@@ -189,7 +189,7 @@ fn valid_dns_host(host: &str) -> bool {
         })
 }
 
-fn validate_dns(dns: &str) -> Result<Option<String>, StoreError> {
+pub(crate) fn validate_dns(dns: &str) -> Result<Option<String>, StoreError> {
     let dns = dns.trim();
     if dns.is_empty() {
         return Ok(None);
@@ -326,12 +326,28 @@ impl Store {
     }
 
     fn ensure_dir(&self) -> Result<(), StoreError> {
-        fs::create_dir_all(&self.dir)?;
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
+            use std::os::unix::fs::{MetadataExt, PermissionsExt};
+            match fs::symlink_metadata(&self.dir) {
+                Ok(meta) => {
+                    if !meta.file_type().is_dir() {
+                        return Err(StoreError::Io("not a directory".into()));
+                    }
+                    if meta.uid() != nix::unistd::geteuid().as_raw() {
+                        return Err(StoreError::Io("unexpected directory owner".into()));
+                    }
+                }
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                    fs::create_dir_all(&self.dir)?;
+                }
+                Err(err) => return Err(err.into()),
+            }
             fs::set_permissions(&self.dir, fs::Permissions::from_mode(0o700))?;
+            check_dir_private(&self.dir)?;
         }
+        #[cfg(not(unix))]
+        fs::create_dir_all(&self.dir)?;
         Ok(())
     }
 
@@ -347,13 +363,17 @@ impl Store {
         if instance.locations.is_empty() {
             return self.delete(&instance.instance_id);
         }
+        self.ensure_dir()?;
         let path = self.path(&instance.instance_id)?;
         let json = serde_json::to_string_pretty(instance)
             .map_err(|err| StoreError::Io(err.to_string()))?;
-        if fs::read_to_string(&path).is_ok_and(|existing| existing == json) {
+        if read_private_file_bytes(&path)
+            .ok()
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+            .is_some_and(|existing| existing == json)
+        {
             return Ok(false);
         }
-        self.ensure_dir()?;
         if !path.exists() && self.instance_files()?.len() >= MAX_INSTANCES {
             return Err(StoreError::TooManyInstances);
         }
@@ -378,6 +398,12 @@ impl Store {
 
     /// Removes an instance's locations. Returns whether a file was removed.
     pub fn delete(&self, instance_id: &str) -> Result<bool, StoreError> {
+        #[cfg(unix)]
+        match fs::symlink_metadata(&self.dir) {
+            Ok(_) => check_dir_private(&self.dir)?,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(err) => return Err(err.into()),
+        }
         match fs::remove_file(self.path(instance_id)?) {
             Ok(()) => Ok(true),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
@@ -465,7 +491,7 @@ fn check_dir_private(dir: &Path) -> Result<(), StoreError> {
     Ok(())
 }
 
-fn load_file(path: &Path) -> Result<StoredInstance, StoreError> {
+fn read_private_file_bytes(path: &Path) -> Result<Vec<u8>, StoreError> {
     let file = {
         #[cfg(unix)]
         {
@@ -506,6 +532,11 @@ fn load_file(path: &Path) -> Result<StoredInstance, StoreError> {
     if raw.len() as u64 > MAX_FILE_SIZE {
         return Err(StoreError::Io("file too large".into()));
     }
+    Ok(raw)
+}
+
+fn load_file(path: &Path) -> Result<StoredInstance, StoreError> {
+    let raw = read_private_file_bytes(path)?;
     let instance: StoredInstance =
         serde_json::from_slice(&raw).map_err(|err| StoreError::Io(err.to_string()))?;
     instance.validate_loaded()?;

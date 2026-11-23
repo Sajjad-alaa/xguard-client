@@ -13,23 +13,28 @@ use tokio::{
 use tonic::transport::server::Connected;
 use tracing::{debug, error, info};
 use windows_sys::Win32::{
-    Foundation::{LocalFree, HANDLE, INVALID_HANDLE_VALUE},
+    Foundation::{HANDLE, INVALID_HANDLE_VALUE, LocalFree},
     Security::{
         Authorization::{ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1},
         PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES,
     },
-    Storage::FileSystem::{FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX},
-    System::Pipes::{CreateNamedPipeW, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES},
+    Storage::FileSystem::{
+        FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
+    },
+    System::Pipes::{
+        CreateNamedPipeW, PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES,
+    },
 };
 
 // Named-pipe name used for IPC between xguard client and windows service.
 pub(super) static PIPE_NAME: &str = r"\\.\pipe\xguard_daemon";
 
 /// SDDL defining named pipe ACL:
+/// - `NU` (Network logon) - denied
 /// - `SY` (LocalSystem) - full control
 /// - `BA` (Administrators) - full control
 /// - `BU` (Built-in Users) - read/write
-static SDDL: &str = "D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;BU)";
+static SDDL: &str = "D:(D;;FA;;;NU)(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;BU)";
 
 /// Tonic-compatible wrapper around a Windows named pipe server handle.
 pub(crate) struct TonicNamedPipeServer {
@@ -93,10 +98,10 @@ fn str_to_wide_null_terminated(s: &str) -> Vec<u16> {
 /// Create a secure Windows named pipe handle with appropriate ACL.
 /// Uses `FILE_FLAG_OVERLAPPED` for Tokio compatibility and sets
 /// `nMaxInstances = PIPE_UNLIMITED_INSTANCES` (255).
-fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
+fn create_secure_pipe(first_instance: bool) -> Result<HANDLE, std::io::Error> {
     debug!("Creating secure named pipe {PIPE_NAME}");
 
-    // Compose SDDL: SYSTEM & Administrators full access, users read-write.
+    // Compose SDDL: deny Network logon; SYSTEM & Administrators full access, users read-write.
     let sddl_wide = str_to_wide_null_terminated(SDDL);
 
     let mut descriptor: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
@@ -123,11 +128,16 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
 
     let name_wide = str_to_wide_null_terminated(PIPE_NAME);
 
+    let mut open_mode = PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED;
+    if first_instance {
+        open_mode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
+    }
+
     let handle = unsafe {
         CreateNamedPipeW(
             name_wide.as_ptr(),
-            PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
-            PIPE_TYPE_BYTE,
+            open_mode,
+            PIPE_TYPE_BYTE | PIPE_REJECT_REMOTE_CLIENTS,
             PIPE_UNLIMITED_INSTANCES,
             65536,
             65536,
@@ -150,9 +160,9 @@ fn create_secure_pipe() -> Result<HANDLE, std::io::Error> {
 }
 
 /// Wrap a raw pipe `HANDLE` into a Tokio `NamedPipeServer`.
-fn create_tokio_secure_pipe() -> Result<NamedPipeServer, std::io::Error> {
+fn create_tokio_secure_pipe(first_instance: bool) -> Result<NamedPipeServer, std::io::Error> {
     debug!("Creating tokio secure pipe");
-    let raw = create_secure_pipe()?;
+    let raw = create_secure_pipe(first_instance)?;
     let pipe = unsafe { NamedPipeServer::from_raw_handle(raw as RawHandle)? };
 
     info!("Created tokio secure pipe");
@@ -170,8 +180,10 @@ pub(crate) fn get_named_pipe_server_stream() -> impl Stream<Item = io::Result<To
     debug!("Creating named pipe server stream");
     let stream = stream! {
         let mut server;
+        let mut first_instance = true;
         loop {
-            server = create_tokio_secure_pipe()?;
+            server = create_tokio_secure_pipe(first_instance)?;
+            first_instance = false;
             server.connect().await?;
             yield Ok(TonicNamedPipeServer::new(server));
         }

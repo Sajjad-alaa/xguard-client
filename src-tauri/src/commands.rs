@@ -825,7 +825,6 @@ pub async fn update_instance(
     app_handle: AppHandle,
 ) -> Result<(), Error> {
     debug!("Received command to update instance with id {instance_id}");
-    trace!("Processing following response:\n {response:#?}");
     if let Some(mut instance) = Instance::find_by_id(&*DB_POOL, instance_id).await? {
         debug!("The instance with id {instance_id} to update was found: {instance}");
         instance.mfa_contract = response
@@ -856,6 +855,21 @@ pub async fn update_instance(
             disconnect_all_tunnels(&app_handle).await?;
         } else if !tunnels_disabled && tunnels_were_disabled {
             TunnelsEnabledPayload::emit(&app_handle);
+        }
+
+        let active = crate::periodic::config::active_location_ids().await;
+        if !active.is_empty() {
+            let after: std::collections::HashMap<_, _> =
+                Location::find_by_instance_id(&*DB_POOL, instance.id, true)
+                    .await?
+                    .into_iter()
+                    .map(|l| (l.id, l))
+                    .collect();
+            let actions =
+                xguard_client_core::config_sync::plan_tunnel_actions(&summary, &active, &after);
+            if !actions.is_empty() {
+                crate::periodic::config::apply_actions(&app_handle, &instance.name, actions).await;
+            }
         }
 
         if summary.locations_changed() {
@@ -1306,18 +1320,25 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
 
         #[cfg(not(target_os = "macos"))]
         {
+            let tunnels_disabled = Instance::tunnels_disabled(&*DB_POOL).await.unwrap_or(false);
             if let Some(pre_down) = &tunnel.pre_down {
-                debug!(
-                    "Executing defined PreDown command before removing the interface {} for the \
-                    tunnel {tunnel}: {pre_down}",
-                    connection.interface_name
-                );
-                let _ = execute_command(pre_down);
-                info!(
-                    "Executed defined PreDown command before removing the interface {} for the \
-                    tunnel {tunnel}: {pre_down}",
-                    connection.interface_name
-                );
+                if tunnels_disabled {
+                    warn!(
+                        "Skipping PreDown hook for tunnel {tunnel} because tunnels are disabled by administrator"
+                    );
+                } else {
+                    debug!(
+                        "Executing defined PreDown command before removing the interface {} for the \
+                        tunnel {tunnel}: {pre_down}",
+                        connection.interface_name
+                    );
+                    let _ = execute_command(pre_down);
+                    info!(
+                        "Executed defined PreDown command before removing the interface {} for the \
+                        tunnel {tunnel}: {pre_down}",
+                        connection.interface_name
+                    );
+                }
             }
             let request = RemoveInterfaceRequest {
                 interface_name: connection.interface_name.clone(),
@@ -1346,17 +1367,23 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
                 connection.interface_name
             );
             if let Some(post_down) = &tunnel.post_down {
-                debug!(
-                    "Executing defined PostDown command after removing the interface {} for the \
-                tunnel {tunnel}: {post_down}",
-                    connection.interface_name
-                );
-                let _ = execute_command(post_down);
-                info!(
-                    "Executed defined PostDown command after removing the interface {} for the \
-                tunnel {tunnel}: {post_down}",
-                    connection.interface_name
-                );
+                if tunnels_disabled {
+                    warn!(
+                        "Skipping PostDown hook for tunnel {tunnel} because tunnels are disabled by administrator"
+                    );
+                } else {
+                    debug!(
+                        "Executing defined PostDown command after removing the interface {} for the \
+                    tunnel {tunnel}: {post_down}",
+                        connection.interface_name
+                    );
+                    let _ = execute_command(post_down);
+                    info!(
+                        "Executed defined PostDown command after removing the interface {} for the \
+                    tunnel {tunnel}: {post_down}",
+                        connection.interface_name
+                    );
+                }
             }
         }
     }
@@ -2931,6 +2958,8 @@ pub async fn mfa_config_oidc_url(
     let session = get_mfa_config_session(&state, &session_id)?;
     mfa_config::ensure_can_authorize_method(MfaMethod::Oidc, &session.capabilities)
         .map_err(err_to_json)?;
+    xguard_client_core::proxy::validate_proxy_url(&session.proxy_url)
+        .map_err(|err| mfa_config_other(format!("Invalid proxy URL: {err}")))?;
     let mut base = session.proxy_url.clone();
     if !base.path().ends_with('/') {
         let path = format!("{}/", base.path());

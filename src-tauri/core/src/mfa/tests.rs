@@ -1,20 +1,20 @@
-use xguard_client_proto::xguard::client_types::{
-    mfa_flow_start_response, mfa_flow_step_finish_request, mfa_step_result, mfa_step_started,
-    ClientMfaFinishRequest, MfaAdvanced, MfaAwaitingExternal, MfaCompleted, MfaFido2Assertion,
-    MfaFido2Challenge, MfaFlowStartAccepted, MfaFlowStartRejected, MfaFlowStartResponse,
-    MfaFlowStepFinishRequest, MfaFlowStepFinishResponse, MfaFlowStepStartResponse,
-    MfaSignatureChallenge, MfaStepRejection, MfaStepResult, MfaStepStarted,
-};
 use reqwest::Url;
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 use wiremock::{
-    matchers::{body_partial_json, method, path},
     Mock, MockServer, ResponseTemplate,
+    matchers::{body_partial_json, method, path},
+};
+use xguard_client_proto::xguard::client_types::{
+    ClientMfaFinishRequest, MfaAdvanced, MfaAwaitingExternal, MfaCompleted, MfaFido2Assertion,
+    MfaFido2Challenge, MfaFlowStartAccepted, MfaFlowStartRejected, MfaFlowStartResponse,
+    MfaFlowStepFinishRequest, MfaFlowStepFinishResponse, MfaFlowStepStartResponse,
+    MfaSignatureChallenge, MfaStepRejection, MfaStepResult, MfaStepStarted,
+    mfa_flow_start_response, mfa_flow_step_finish_request, mfa_step_result, mfa_step_started,
 };
 
 use super::*;
-use crate::test_helpers::{start_ws_stub, WsStubCommand};
+use crate::test_helpers::{WsStubCommand, start_ws_stub};
 
 #[test]
 fn test_mfa_route_display() {
@@ -355,9 +355,7 @@ async fn test_mfa_start_forbidden_is_rejection() {
 
     Mock::given(method("POST"))
         .and(path("/api/v1/client-mfa/start"))
-        .respond_with(
-            ResponseTemplate::new(403).set_body_json(json!({ "error": "access denied" })),
-        )
+        .respond_with(ResponseTemplate::new(403).set_body_json(json!({ "error": "access denied" })))
         .mount(&server)
         .await;
 
@@ -1346,10 +1344,13 @@ async fn test_mobile_approve_connect_error_does_not_leak_token() {
 
 #[test]
 fn test_derive_ws_url_http_to_ws() {
-    let base = Url::parse("http://proxy.example.com/").unwrap();
-    let ws = derive_ws_url(&base, "tok").unwrap();
-    assert!(ws.starts_with("ws://proxy.example.com/api/v1/client-mfa/remote"));
+    let local_base = Url::parse("http://127.0.0.1:8080/").unwrap();
+    let ws = derive_ws_url(&local_base, "tok").unwrap();
+    assert!(ws.starts_with("ws://127.0.0.1:8080/api/v1/client-mfa/remote"));
     assert!(ws.contains("token=tok"));
+
+    let remote_http = Url::parse("http://proxy.example.com/").unwrap();
+    assert!(derive_ws_url(&remote_http, "tok").is_err());
 }
 
 #[test]

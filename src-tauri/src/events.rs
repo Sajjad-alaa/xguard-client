@@ -1,14 +1,14 @@
-pub use xguard_client_core::events::EventKey;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_notification::NotificationExt;
+pub use xguard_client_core::events::EventKey;
 
 use crate::{
+    ConnectionType,
     appstate::AppState,
     commands::LocationInfo,
-    database::models::{instance::InstanceInfo, location::LocationMfaMethod, Id},
-    window_manager::{WindowManager, COMPACT_WINDOW_ID},
-    ConnectionType,
+    database::models::{Id, instance::InstanceInfo, location::LocationMfaMethod},
+    window_manager::{COMPACT_WINDOW_ID, WindowManager},
 };
 
 /// Used as payload for [`DEAD_CONNECTION_DROPPED`] event
@@ -137,6 +137,17 @@ pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
                 }
             }
             if let (Some(token), Some(url)) = (token, url) {
+                let parsed = match Url::parse(&url) {
+                    Ok(parsed) => parsed,
+                    Err(err) => {
+                        warn!("Ignoring deep link with unparseable proxy URL: {err}");
+                        continue;
+                    }
+                };
+                if let Err(err) = xguard_client_core::proxy::validate_proxy_url(&parsed) {
+                    warn!("Ignoring deep link with unsafe proxy URL: {err}");
+                    continue;
+                }
                 info!("Valid Deep link received.");
                 let payload = AddInstancePayload { token, url };
                 let app_state = app_handle.state::<AppState>();

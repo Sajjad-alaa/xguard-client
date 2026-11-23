@@ -705,6 +705,7 @@ impl<I> Location<I> {
     pub fn is_service_location(&self) -> bool {
         self.service_location_mode != ServiceLocationMode::Disabled
             && self.location_mfa_mode == LocationMfaMode::Disabled
+            && !self.posture_check_required
     }
 }
 

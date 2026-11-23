@@ -2,29 +2,29 @@ use std::process::Command;
 /// Connection setup helpers.
 use std::str::FromStr;
 
+#[cfg(not(target_os = "macos"))]
+use tonic::Code;
 use xguard_client_common::{find_free_tcp_port, get_interface_name};
 use xguard_client_proto::xguard::client::v1::CreateInterfaceRequest;
 #[cfg(not(target_os = "macos"))]
 use xguard_client_proto::xguard::client::v1::RemoveInterfaceRequest;
-use xguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
-#[cfg(not(target_os = "macos"))]
-use tonic::Code;
+use xguard_wireguard_rs::{InterfaceConfiguration, key::Key, net::IpAddrMask, peer::Peer};
 
 #[cfg(not(target_os = "macos"))]
 use crate::database::DbPool;
 use crate::{
+    ConnectionType, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
     connection::daemon_client::DAEMON_CLIENT,
     database::{
+        DB_POOL,
         models::{
+            Id,
             connection::{ActiveConnection, Connection},
             location::Location,
             tunnel::{Tunnel, TunnelConnection},
-            Id,
         },
-        DB_POOL,
     },
     error::Error,
-    ConnectionType, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
 };
 
 #[cfg(not(target_os = "macos"))]
@@ -392,6 +392,12 @@ pub async fn disconnect_interface(active_connection: &ActiveConnection) -> Resul
 }
 
 pub fn execute_command(command: &str) -> Result<(), Error> {
+    if !std::env::var("XGUARD_ALLOW_TUNNEL_HOOKS").is_ok_and(|v| v == "1") {
+        warn!(
+            "Skipping WireGuard interface hook command; set XGUARD_ALLOW_TUNNEL_HOOKS=1 to allow hook execution"
+        );
+        return Ok(());
+    }
     debug!("Executing command: {command}");
     let mut command_parts = command.split_whitespace();
 

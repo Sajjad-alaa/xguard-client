@@ -356,6 +356,8 @@ pub fn network_fingerprint() -> Option<u64> {
 pub enum TunnelAction {
     /// The location is gone, or became a service location the background service runs now.
     Disconnect(Id),
+    /// Access policy (MFA / posture / traffic policy) tightened on an MFA location; disconnect immediately.
+    DisconnectForPolicy(Id),
     /// The tunnel settings changed and the location needs no user interaction to connect.
     Reconnect(Id),
     /// The tunnel settings changed but connecting needs the user (MFA): ask them to reconnect.
@@ -383,10 +385,12 @@ pub fn plan_tunnel_actions(
         let Some(location) = after.get(&id) else {
             continue;
         };
-        if location.service_location_mode
-            != crate::database::models::location::ServiceLocationMode::Disabled
-        {
+        if location.is_service_location() {
             actions.push(TunnelAction::Disconnect(id));
+        } else if location.location_mfa_mode != LocationMfaMode::Disabled
+            && (summary.policy_tightened_ids.contains(&id) || summary.traffic_policy_changed)
+        {
+            actions.push(TunnelAction::DisconnectForPolicy(id));
         } else if summary.tunnel_changed_ids.contains(&id) || summary.traffic_policy_changed {
             // Posture-only locations reconnect on their own (the check needs no user); MFA does.
             if location.location_mfa_mode != LocationMfaMode::Disabled {

@@ -320,3 +320,31 @@ fn reconciler_plans_desired_versus_actual() {
     let rotated = desired_tunnels(&[rotated]);
     assert_ne!(rotated[0].fingerprint, fingerprint(1));
 }
+
+#[cfg(unix)]
+#[test]
+fn store_save_and_delete_reject_symlink_and_lax_dir() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("real");
+    std::fs::create_dir(&target).unwrap();
+    let link_dir = dir.path().join("symlink_dir");
+    symlink(&target, &link_dir).unwrap();
+
+    let instance =
+        StoredInstance::from_request(&request(vec![location(1, ProtoMode::AlwaysOn)])).unwrap();
+    let link_store = Store::new(link_dir);
+    assert!(matches!(link_store.save(&instance), Err(StoreError::Io(_))));
+
+    let lax_dir = dir.path().join("lax_dir");
+    std::fs::create_dir(&lax_dir).unwrap();
+    std::fs::set_permissions(&lax_dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let lax_store = Store::new(lax_dir.clone());
+    assert!(matches!(lax_store.delete(INSTANCE), Err(StoreError::Io(_))));
+    assert!(lax_store.save(&instance).unwrap());
+    assert_eq!(
+        std::fs::metadata(&lax_dir).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+}

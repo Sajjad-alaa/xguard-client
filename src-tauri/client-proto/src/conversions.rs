@@ -6,11 +6,11 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
-use xguard_wireguard_rs::{
-    host::Host, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
-};
 use tonic::Status;
 use tracing::debug;
+use xguard_wireguard_rs::{
+    InterfaceConfiguration, host::Host, key::Key, net::IpAddrMask, peer::Peer,
+};
 
 use crate::xguard::client::v1::{InterfaceConfig, InterfaceData, Peer as ProtoPeer};
 
@@ -174,7 +174,15 @@ impl From<Host> for InterfaceData {
     fn from(host: Host) -> Self {
         Self {
             listen_port: u32::from(host.listen_port),
-            peers: host.peers.into_values().map(Into::into).collect(),
+            peers: host
+                .peers
+                .into_values()
+                .map(|peer| {
+                    let mut proto: ProtoPeer = peer.into();
+                    proto.preshared_key = None;
+                    proto
+                })
+                .collect(),
         }
     }
 }
@@ -183,8 +191,8 @@ impl From<Host> for InterfaceData {
 mod tests {
     use std::time::SystemTime;
 
-    use xguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer};
     use x25519_dalek::{EphemeralSecret, PublicKey};
+    use xguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer};
 
     use super::*;
 
@@ -312,8 +320,9 @@ mod tests {
     fn test_host_to_interface_data() {
         let secret = EphemeralSecret::random();
         let host_key: Key = PublicKey::from(&secret).as_ref().try_into().unwrap();
-        let mut host = Host::new(51820, host_key);
-        let peer = sample_peer();
+        let mut host = Host::new(51820, host_key.clone());
+        let mut peer = sample_peer();
+        peer.preshared_key = Some(host_key);
         host.peers.insert(peer.public_key.clone(), peer.clone());
 
         let data: InterfaceData = host.into();
@@ -321,6 +330,7 @@ mod tests {
         assert_eq!(data.listen_port, 51820);
         assert_eq!(data.peers.len(), 1);
         assert_eq!(data.peers[0].public_key, peer.public_key.to_lower_hex());
+        assert_eq!(data.peers[0].preshared_key, None);
     }
 
     #[test]

@@ -140,7 +140,7 @@ function Get-OnPremisesADProvisioningConfig {
         # Read JSON data from the specified AD attribute
         $jsonData = $adUser.$ADAttribute
         
-        Write-Host "XGuard Enrollment JSON ($ADAttribute): $jsonData"
+        Write-Host "XGuard Enrollment JSON loaded from $ADAttribute."
         
         if ($jsonData) {
             try {
@@ -152,7 +152,7 @@ function Get-OnPremisesADProvisioningConfig {
                 $enrollmentToken = $enrollmentConfig.enrollmentToken
                 
                 Write-Host "XGuard Enrollment URL:   $enrollmentUrl"
-                Write-Host "XGuard Enrollment Token: $enrollmentToken"
+                Write-Host "XGuard Enrollment Token: [REDACTED]"
                 
                 # Save enrollment data to JSON file only if both URL and token exist
                 if ($enrollmentUrl -and $enrollmentToken) {
@@ -251,7 +251,7 @@ function Get-EntraIDProvisioningConfig {
                     $enrollmentToken = $xguardAttrs["EnrollmentToken"]
                     
                     Write-Host "XGuard Enrollment URL:   $enrollmentUrl"
-                    Write-Host "XGuard Enrollment Token: $enrollmentToken"
+                    Write-Host "XGuard Enrollment Token: [REDACTED]"
 
                     # Save enrollment data to JSON file only if both URL and token exist
                     if ($enrollmentUrl -and $enrollmentToken) {

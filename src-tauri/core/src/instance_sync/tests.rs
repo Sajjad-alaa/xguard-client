@@ -123,6 +123,7 @@ async fn test_adds_updates_and_removes_locations(pool: SqlitePool) {
             removed: 1,
             removed_ids: vec![removed_id],
             tunnel_changed_ids: vec![hq_id],
+            policy_tightened_ids: Vec::new(),
             traffic_policy_changed: false,
         }
     );
@@ -350,4 +351,93 @@ async fn test_url_and_proxy_url_stay_pinned_across_sync(pool: SqlitePool) {
         .unwrap();
     assert_eq!(stored.url, "https://xguard.local");
     assert_eq!(stored.proxy_url, "https://edge.xguard.local");
+}
+
+#[sqlx::test(migrations = "../migrations")]
+#[allow(deprecated)]
+async fn test_policy_tightened_tracks_mfa_and_posture(pool: SqlitePool) {
+    use crate::proto::client_types::{
+        LocationMfaMode as ProtoMfaMode, MfaMethod as ProtoMfaMethod, MfaStep as ProtoMfaStep,
+        MfaStepMethod as ProtoMfaStepMethod,
+    };
+
+    let mut loc_enable_mfa = config(1, "mfa-added", "hq1:51820");
+    loc_enable_mfa.location_mfa_mode = Some(ProtoMfaMode::Disabled as i32);
+
+    let mut loc_narrow = config(2, "mfa-narrow", "hq2:51820");
+    loc_narrow.location_mfa_mode = Some(ProtoMfaMode::Internal as i32);
+    loc_narrow.steps = vec![ProtoMfaStep {
+        methods: vec![
+            ProtoMfaStepMethod {
+                method: ProtoMfaMethod::Email as i32,
+                configured: true,
+            },
+            ProtoMfaStepMethod {
+                method: ProtoMfaMethod::Totp as i32,
+                configured: true,
+            },
+        ],
+    }];
+
+    let loc_posture = config(3, "posture", "hq3:51820");
+    let mut loc_relaxed = config(4, "relaxed", "hq4:51820");
+    loc_relaxed.location_mfa_mode = Some(ProtoMfaMode::Internal as i32);
+    loc_relaxed.steps = vec![ProtoMfaStep {
+        methods: vec![ProtoMfaStepMethod {
+            method: ProtoMfaMethod::Email as i32,
+            configured: true,
+        }],
+    }];
+
+    let mut instance = setup(
+        &pool,
+        vec![loc_enable_mfa, loc_narrow, loc_posture, loc_relaxed],
+    )
+    .await;
+    let saved = locations(&pool, &instance).await;
+    let id_map: std::collections::HashMap<Id, Id> =
+        saved.into_iter().map(|l| (l.network_id, l.id)).collect();
+
+    let mut next_1 = config(1, "mfa-added", "hq1:51820");
+    next_1.location_mfa_mode = Some(ProtoMfaMode::Internal as i32);
+
+    let mut next_2 = config(2, "mfa-narrow", "hq2:51820");
+    next_2.location_mfa_mode = Some(ProtoMfaMode::Internal as i32);
+    next_2.steps = vec![ProtoMfaStep {
+        methods: vec![ProtoMfaStepMethod {
+            method: ProtoMfaMethod::Fido2 as i32,
+            configured: true,
+        }],
+    }];
+
+    let mut next_3 = config(3, "posture", "hq3:51820");
+    next_3.posture_check_required = Some(true);
+
+    let mut next_4 = config(4, "relaxed", "hq4:51820");
+    next_4.location_mfa_mode = Some(ProtoMfaMode::Internal as i32);
+    next_4.steps = vec![ProtoMfaStep {
+        methods: vec![
+            ProtoMfaStepMethod {
+                method: ProtoMfaMethod::Email as i32,
+                configured: true,
+            },
+            ProtoMfaStepMethod {
+                method: ProtoMfaMethod::Totp as i32,
+                configured: true,
+            },
+        ],
+    }];
+
+    let summary = apply(
+        &pool,
+        &mut instance,
+        response("office", vec![next_1, next_2, next_3, next_4], None),
+    )
+    .await
+    .unwrap();
+
+    let mut expected = vec![id_map[&1], id_map[&2], id_map[&3]];
+    expected.sort_unstable();
+    assert_eq!(summary.policy_tightened_ids, expected);
+    assert!(!summary.policy_tightened_ids.contains(&id_map[&4]));
 }

@@ -3,9 +3,6 @@
   "identifier": "main-capability",
   "description": "Capability for the main window",
   "local": true,
-  "remote": {
-    "urls": ["http://localhost:5072/*"]
-  },
   "windows": ["compact-view", "full-view", "welcome"],
   "permissions": [
     "core:webview:allow-create-webview",

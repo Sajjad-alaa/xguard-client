@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use serde_json::json;
 use sqlx::SqlitePool;
 use wiremock::{
-    matchers::{body_json, header_exists, method, path},
     Mock, MockServer, ResponseTemplate,
+    matchers::{body_json, header_exists, method, path},
 };
 
 use super::*;
@@ -69,10 +69,12 @@ fn parses_not_modified_and_changed_responses() {
         r#"{{"config_revision":"{}","not_modified":true}}"#,
         "a".repeat(500)
     );
-    assert!(parse_poll_response(long.as_bytes())
-        .unwrap()
-        .revision
-        .is_none());
+    assert!(
+        parse_poll_response(long.as_bytes())
+            .unwrap()
+            .revision
+            .is_none()
+    );
 
     assert!(matches!(
         parse_poll_response(br#"{"not_modified":false}"#),
@@ -405,4 +407,68 @@ async fn sync_instance_needs_a_token(pool: SqlitePool) {
 fn network_fingerprint_is_stable() {
     let first = network_fingerprint().expect("available on Unix");
     assert_eq!(network_fingerprint(), Some(first));
+}
+
+#[test]
+fn policy_tightening_disconnects_mfa_tunnel() {
+    use crate::database::models::location::{Location, LocationMfaMode};
+
+    let make_loc = |id: Id, mfa: LocationMfaMode| Location {
+        id,
+        instance_id: 1,
+        network_id: id,
+        name: format!("loc-{id}"),
+        address: "10.0.0.2/24".into(),
+        pubkey: "k".into(),
+        endpoint: "vpn.example.com:51820".into(),
+        allowed_ips: "10.0.0.0/24".into(),
+        dns: None,
+        route_all_traffic: false,
+        keepalive_interval: 25,
+        location_mfa_mode: mfa,
+        service_location_mode: ServiceLocationMode::Disabled,
+        mfa_method: None,
+        posture_check_required: false,
+        mfa_steps: Default::default(),
+        mfa_step_plan: Default::default(),
+        client_mtu: None,
+    };
+
+    let active: HashSet<Id> = [1, 2].into();
+    let after: HashMap<Id, _> = [
+        make_loc(1, LocationMfaMode::Internal),
+        make_loc(2, LocationMfaMode::Disabled),
+    ]
+    .into_iter()
+    .map(|l| (l.id, l))
+    .collect();
+
+    let tightened = SyncSummary {
+        policy_tightened_ids: vec![1],
+        tunnel_changed_ids: vec![1],
+        ..SyncSummary::default()
+    };
+    assert_eq!(
+        plan_tunnel_actions(&tightened, &active, &after),
+        [TunnelAction::DisconnectForPolicy(1)]
+    );
+
+    let policy_changed = SyncSummary {
+        traffic_policy_changed: true,
+        ..SyncSummary::default()
+    };
+    let mut actions = plan_tunnel_actions(&policy_changed, &active, &after);
+    actions.sort_by_key(|a| match a {
+        TunnelAction::Disconnect(id)
+        | TunnelAction::DisconnectForPolicy(id)
+        | TunnelAction::Reconnect(id)
+        | TunnelAction::ReconnectByUser(id) => *id,
+    });
+    assert_eq!(
+        actions,
+        [
+            TunnelAction::DisconnectForPolicy(1),
+            TunnelAction::Reconnect(2),
+        ]
+    );
 }

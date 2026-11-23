@@ -12,7 +12,7 @@ use crate::{
     database::models::{
         Id,
         instance::Instance,
-        location::{Location, infer_mfa_method},
+        location::{Location, LocationMfaMode, LocationMfaStep, infer_mfa_method, legacy_mfa_steps},
     },
     error::Error,
     into_location,
@@ -32,6 +32,8 @@ pub struct SyncSummary {
     /// routes, DNS, MTU, keepalive, MFA or service mode): a live tunnel no longer matches them.
     /// Renames and other display-only changes are not listed.
     pub tunnel_changed_ids: Vec<Id>,
+    /// Local IDs of updated locations whose MFA or posture requirements tightened.
+    pub policy_tightened_ids: Vec<Id>,
     /// The client traffic policy changed, so the routing of every live tunnel may be stale.
     pub traffic_policy_changed: bool,
 }
@@ -88,11 +90,15 @@ pub async fn apply_device_config(
         match existing.remove(&incoming.network_id) {
             Some(mut current) => {
                 let tunnel_changed = tunnel_settings_differ(&current, &incoming);
+                let tightened = policy_tightened(&current, &incoming);
                 if merge_location(&mut current, incoming) {
                     current.save(&mut *conn).await?;
                     summary.updated += 1;
                     if tunnel_changed {
                         summary.tunnel_changed_ids.push(current.id);
+                    }
+                    if tightened {
+                        summary.policy_tightened_ids.push(current.id);
                     }
                 }
             }
@@ -111,8 +117,52 @@ pub async fn apply_device_config(
     }
     summary.removed_ids.sort_unstable();
     summary.tunnel_changed_ids.sort_unstable();
+    summary.policy_tightened_ids.sort_unstable();
 
     Ok(summary)
+}
+
+fn effective_mfa_steps(
+    mode: LocationMfaMode,
+    steps: &[LocationMfaStep],
+) -> Vec<LocationMfaStep> {
+    if steps.is_empty() {
+        legacy_mfa_steps(mode)
+    } else {
+        steps.to_vec()
+    }
+}
+
+/// Whether `incoming` imposes stricter posture or MFA requirements than `current`.
+fn policy_tightened(current: &Location<Id>, incoming: &Location) -> bool {
+    if !current.posture_check_required && incoming.posture_check_required {
+        return true;
+    }
+    if incoming.location_mfa_mode == LocationMfaMode::Disabled {
+        return false;
+    }
+    if current.location_mfa_mode == LocationMfaMode::Disabled {
+        return true;
+    }
+
+    let prev_steps = effective_mfa_steps(current.location_mfa_mode, &current.mfa_steps.0);
+    let next_steps = effective_mfa_steps(incoming.location_mfa_mode, &incoming.mfa_steps.0);
+
+    if next_steps.len() > prev_steps.len() {
+        return true;
+    }
+
+    prev_steps
+        .iter()
+        .zip(next_steps.iter())
+        .any(|(prev_step, next_step)| {
+            prev_step.methods.iter().any(|prev_m| {
+                !next_step
+                    .methods
+                    .iter()
+                    .any(|next_m| next_m.method == prev_m.method)
+            })
+        })
 }
 
 /// Copies server-owned instance fields from `info`. Returns whether anything changed.

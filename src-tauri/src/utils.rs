@@ -1,28 +1,11 @@
+use std::env;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
 #[cfg(not(target_os = "macos"))]
 use std::{collections::HashMap, str::FromStr};
-use std::{env, process::Command};
 #[cfg(target_os = "linux")]
 use std::{fs, path::Path};
 
-#[cfg(not(target_os = "macos"))]
-use xguard_client_common::{find_free_tcp_port, get_interface_name};
-#[cfg(windows)]
-use xguard_client_core::connection::active_connections::find_connection;
-#[cfg(target_os = "macos")]
-use xguard_client_core::connection::apple::tunnel_stats;
-use xguard_client_core::connection::{bring_up, ConnectionTarget};
-#[cfg(not(target_os = "macos"))]
-use xguard_client_core::{
-    connection::daemon_client::DAEMON_CLIENT, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
-};
-#[cfg(not(target_os = "macos"))]
-use xguard_client_proto::xguard::client::v1::{
-    CreateInterfaceRequest, ReadInterfaceDataRequest,
-};
-#[cfg(not(target_os = "macos"))]
-use xguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use sqlx::query;
 use tauri::{AppHandle, Emitter, Manager};
 use tracing::Level;
@@ -33,22 +16,37 @@ use windows_service::{
 };
 #[cfg(windows)]
 use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
+#[cfg(not(target_os = "macos"))]
+use xguard_client_common::{find_free_tcp_port, get_interface_name};
+#[cfg(windows)]
+use xguard_client_core::connection::active_connections::find_connection;
+#[cfg(target_os = "macos")]
+use xguard_client_core::connection::apple::tunnel_stats;
+use xguard_client_core::connection::{ConnectionTarget, bring_up};
+#[cfg(not(target_os = "macos"))]
+use xguard_client_core::{
+    DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6, connection::daemon_client::DAEMON_CLIENT,
+};
+#[cfg(not(target_os = "macos"))]
+use xguard_client_proto::xguard::client::v1::{CreateInterfaceRequest, ReadInterfaceDataRequest};
+#[cfg(not(target_os = "macos"))]
+use xguard_wireguard_rs::{InterfaceConfiguration, key::Key, net::IpAddrMask, peer::Peer};
 
 #[cfg(not(target_os = "macos"))]
 use crate::database::models::{
     location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats,
 };
 use crate::{
+    ConnectionType,
     appstate::AppState,
     commands::LocationInterfaceDetails,
     database::{
-        models::{location::Location, tunnel::Tunnel, wireguard_keys::WireguardKeys, Id},
-        DbPool, DB_POOL,
+        DB_POOL, DbPool,
+        models::{Id, location::Location, tunnel::Tunnel, wireguard_keys::WireguardKeys},
     },
     error::Error,
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
-    ConnectionType,
 };
 
 // Work-around MFA propagation delay. FIXME: remove once Core API is corrected.
@@ -138,7 +136,9 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
     let mut previous_totals = None;
 
     loop {
-        debug!("Waiting for the next stats collection interval for ID {id} and connection type {connection_type:?}");
+        debug!(
+            "Waiting for the next stats collection interval for ID {id} and connection type {connection_type:?}"
+        );
         interval.tick().await;
 
         let stats = tunnel_stats(id, &connection_type);
@@ -226,7 +226,10 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
         match stream.message().await {
             Ok(Some(interface_data)) => {
                 debug!("Received new network usage statistics for interface {interface_name}.");
-                trace!("Received interface data: {interface_data:?}");
+                trace!(
+                    "Received interface data ({} peers).",
+                    interface_data.peers.len()
+                );
 
                 // begin transaction
                 let mut transaction = match pool.begin().await {
@@ -775,26 +778,7 @@ pub(crate) async fn handle_connection_for_tunnel(
 
 /// Execute command passed as argument.
 pub fn execute_command(command: &str) -> Result<(), Error> {
-    debug!("Executing command: {command}");
-    let mut command_parts = command.split_whitespace();
-
-    if let Some(command) = command_parts.next() {
-        let output = Command::new(command).args(command_parts).output()?;
-
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
-
-            debug!("Command {command} executed successfully. Stdout: {stdout}");
-            if !stderr.is_empty() {
-                error!("Command produced the following output on stderr: {stderr}");
-            }
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            error!("Error while executing command: {command}. Stderr: {stderr}");
-        }
-    }
-    Ok(())
+    xguard_client_core::connection::execute_command(command)
 }
 /// Helper function to get the name of a tunnel or location by its ID
 /// Returns the name of the tunnel or location if it exists, otherwise "UNKNOWN"
@@ -870,7 +854,7 @@ async fn check_connection(
         }
         Err(err) => {
             warn!(
-              "Failed to query service status for interface {interface_name} while synchronizing \
+                "Failed to query service status for interface {interface_name} while synchronizing \
               active connections. This may cause the {connection_type} {name} state to display \
               incorrectly in the client. Reconnect to it manually to fix it. Error: {err}",
             );

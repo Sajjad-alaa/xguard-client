@@ -55,7 +55,7 @@ struct InstanceState {
     last: Option<Instant>,
 }
 
-async fn active_location_ids() -> HashSet<Id> {
+pub(crate) async fn active_location_ids() -> HashSet<Id> {
     ACTIVE_CONNECTIONS
         .lock()
         .await
@@ -65,7 +65,11 @@ async fn active_location_ids() -> HashSet<Id> {
         .collect()
 }
 
-async fn apply_actions(handle: &AppHandle, instance_name: &str, actions: Vec<TunnelAction>) {
+pub(crate) async fn apply_actions(
+    handle: &AppHandle,
+    instance_name: &str,
+    actions: Vec<TunnelAction>,
+) {
     let mut ask_user = false;
     for action in actions {
         match action {
@@ -76,6 +80,13 @@ async fn apply_actions(handle: &AppHandle, instance_name: &str, actions: Vec<Tun
                 if let Err(err) = disconnect(id, ConnectionType::Location, handle.clone()).await {
                     warn!("Failed to disconnect location {id}: {err}");
                 }
+            }
+            TunnelAction::DisconnectForPolicy(id) => {
+                info!("Policy tightened for active MFA location {id}; disconnecting");
+                if let Err(err) = disconnect(id, ConnectionType::Location, handle.clone()).await {
+                    warn!("Failed to disconnect location {id} for policy change: {err}");
+                }
+                ask_user = true;
             }
             TunnelAction::Reconnect(id) => {
                 info!("Location {id} settings changed; reconnecting");

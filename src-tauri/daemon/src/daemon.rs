@@ -50,7 +50,7 @@ use crate::named_pipe::{PIPE_NAME, get_named_pipe_server_stream};
 #[cfg(any(windows, target_os = "linux"))]
 use crate::service_locations::{
     ServiceLocationManager, run_reconciler,
-    store::{Store, StoreError, StoredInstance, validate_instance_id},
+    store::{Store, StoreError, StoredInstance, validate_dns, validate_instance_id},
     wake_reconciler,
 };
 use crate::{VERSION, config::Config};
@@ -178,6 +178,32 @@ fn configure_new_interface(
     interface_config: &mut InterfaceConfiguration,
 ) -> Result<(), Status> {
     configure_interface(ifname, &request.dns, wgapi, interface_config)
+}
+
+pub(crate) fn validate_interface_name(name: &str) -> Result<(), Status> {
+    if name.is_empty() || name.len() > 15 || !name.is_ascii() {
+        return Err(Status::new(
+            Code::InvalidArgument,
+            "Invalid interface name: must be 1..=15 ASCII characters",
+        ));
+    }
+    if name.starts_with('-')
+        || !name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    {
+        return Err(Status::new(
+            Code::InvalidArgument,
+            "Invalid interface name: disallowed character or leading '-'",
+        ));
+    }
+    if name.to_ascii_lowercase().starts_with("xgs") {
+        return Err(Status::new(
+            Code::InvalidArgument,
+            "Interface name uses reserved 'xgs' prefix",
+        ));
+    }
+    Ok(())
 }
 
 /// Configures a freshly created interface: addresses, peers, routing and DNS. Shared by
@@ -350,15 +376,32 @@ impl DesktopDaemonService for DaemonService {
             .try_into()
             .inspect_err(|err| error!("Invalid interface config in request: {err}"))?;
         let ifname = config.name.clone();
+        validate_interface_name(&ifname)?;
+        if let Some(dns) = request.dns.as_deref() {
+            validate_dns(dns).map_err(|err| Status::new(Code::InvalidArgument, err.to_string()))?;
+        }
+        if let Some(mtu) = config.mtu {
+            if !(576..=9200).contains(&mtu) {
+                return Err(Status::new(
+                    Code::InvalidArgument,
+                    format!("Invalid MTU {mtu}: expected 576..=9200"),
+                ));
+            }
+        }
+
         let _span = info_span!("create_interface", interface_name = &ifname).entered();
         // Setup WireGuard API.
         let Ok(mut wgapis_map) = self.wgapis.write() else {
             error!("Failed to acquire read-write lock for WGApis");
             return Err(Status::new(Code::Internal, "read-write lock error"));
         };
-        let wgapi = wgapis_map
-            .entry(ifname.clone())
-            .or_insert(setup_wgapi(&ifname)?);
+        if wgapis_map.contains_key(&ifname) {
+            return Err(Status::new(
+                Code::AlreadyExists,
+                format!("WireGuard interface {ifname} already exists"),
+            ));
+        }
+        let mut wgapi = setup_wgapi(&ifname)?;
 
         // create new interface
         debug!("Creating new interface {ifname}");
@@ -371,7 +414,7 @@ impl DesktopDaemonService for DaemonService {
 
         // attempt to configure new interface
         // remove interface if configuration fails to avoid duplicate interfaces
-        match configure_new_interface(&ifname, &request, wgapi, &mut config) {
+        match configure_new_interface(&ifname, &request, &mut wgapi, &mut config) {
             Ok(()) => info!("Finished configuring new interface {ifname}"),
             Err(err) => {
                 error!("Failed to configure interface {ifname}. Error: {err}");
@@ -386,6 +429,7 @@ impl DesktopDaemonService for DaemonService {
                 return Err(err);
             }
         }
+        wgapis_map.insert(ifname.clone(), wgapi);
 
         debug!("Finished creating a new interface {ifname}");
         Ok(Response::new(()))
@@ -490,6 +534,9 @@ impl DesktopDaemonService for DaemonService {
                     match result {
                         Ok(mut host) => {
                             let peers = &mut host.peers;
+                            for peer in peers.values_mut() {
+                                peer.preshared_key = None;
+                            }
                             debug!(
                                 "Found {} peers configured on WireGuard interface",
                                 peers.len()
@@ -579,7 +626,10 @@ impl DesktopDaemonService for DaemonService {
                 };
                 if let Some(wgapi) = wgapis_map.get(ifname) {
                     match wgapi.read_interface_data() {
-                        Ok(host) => {
+                        Ok(mut host) => {
+                            for peer in host.peers.values_mut() {
+                                peer.preshared_key = None;
+                            }
                             debug!("ListInterfaces: returning data for {ifname}");
                             Some(host.into())
                         }
@@ -782,5 +832,17 @@ mod tests {
                 None
             );
         }
+    }
+
+    #[test]
+    fn test_validate_interface_name() {
+        assert!(validate_interface_name("wg0").is_ok());
+        assert!(validate_interface_name("xguard_main-1").is_ok());
+        assert!(validate_interface_name("").is_err());
+        assert!(validate_interface_name("-wg0").is_err());
+        assert!(validate_interface_name("xgs0").is_err());
+        assert!(validate_interface_name("XGS_test").is_err());
+        assert!(validate_interface_name("too_long_ifname12").is_err());
+        assert!(validate_interface_name("wg 0").is_err());
     }
 }

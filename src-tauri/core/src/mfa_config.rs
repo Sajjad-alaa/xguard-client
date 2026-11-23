@@ -22,7 +22,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     database::models::{instance::MfaCapabilities, Id},
     mfa::{OIDC_POLL_INTERVAL, OIDC_POLL_TIMEOUT},
-    proxy::post_with_headers,
+    proxy::{join_proxy_endpoint, post_with_headers},
 };
 
 // No leading slash: it would make `Url::join` discard a proxy base path (`https://host/xguard/`).
@@ -285,11 +285,7 @@ pub fn authorizing_methods(
 }
 
 fn build_url(proxy_url: &Url, endpoint: &str) -> Result<Url, MfaConfigError> {
-    proxy_url
-        .join(endpoint)
-        .map_err(|err| MfaConfigError::Other {
-            message: format!("Failed to build MFA configuration URL: {err}"),
-        })
+    join_proxy_endpoint(proxy_url, endpoint).map_err(|message| MfaConfigError::Other { message })
 }
 
 async fn check_response(response: Response, endpoint: &str) -> Result<Response, MfaConfigError> {

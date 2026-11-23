@@ -36,7 +36,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     database::models::Id,
     mfa_contract::MfaContract,
-    proxy::{construct_platform_header, http_client},
+    proxy::{construct_platform_header, http_client, join_proxy_endpoint, validate_proxy_url},
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
 
@@ -117,10 +117,24 @@ pub struct MfaFinishRequest {
     pub submission: Option<MfaFinishSubmission>,
 }
 
-#[derive(Debug)]
 pub enum MfaFinishResponse {
     Legacy { preshared_key: String },
     MultiStep { result: MfaStepResult },
+}
+
+impl std::fmt::Debug for MfaFinishResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Legacy { .. } => f
+                .debug_struct("MfaFinishResponse::Legacy")
+                .field("preshared_key", &"[REDACTED]")
+                .finish(),
+            Self::MultiStep { result } => f
+                .debug_struct("MfaFinishResponse::MultiStep")
+                .field("result", result)
+                .finish(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -272,9 +286,7 @@ fn route_url(proxy_url: &Url, contract: MfaContract, route: MfaRoute) -> Result<
     let path = route_path(contract, route).ok_or_else(|| MfaError::Other {
         message: "The legacy MFA contract does not support step start".into(),
     })?;
-    proxy_url.join(path).map_err(|e| MfaError::Other {
-        message: format!("Failed to build {route} URL: {e}"),
-    })
+    join_proxy_endpoint(proxy_url, path).map_err(|message| MfaError::Other { message })
 }
 
 fn started_step(step: MfaStepStarted) -> Result<MfaStepStartResponse, MfaError> {
@@ -722,6 +734,9 @@ pub fn derive_ws_url(
     token: &str,
     step_attempt_id: Option<&str>,
 ) -> Result<String, MfaError> {
+    validate_proxy_url(proxy_base).map_err(|reason| MfaError::Other {
+        message: format!("Refusing unsafe proxy URL '{proxy_base}': {reason}"),
+    })?;
     let mut ws_url = route_url(proxy_base, contract, MfaRoute::Remote)?;
     let ws_scheme = match proxy_base.scheme() {
         "https" => "wss",

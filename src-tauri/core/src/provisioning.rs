@@ -410,7 +410,9 @@ pub fn mark_consumed(app_data_dir: &Path, found: &FoundProvisioning) {
         let write_result = options.open(&tmp).and_then(|mut file| {
             use std::io::Write;
             file.write_all(payload.as_bytes())?;
+            file.flush()?;
             file.sync_all()?;
+            drop(file);
             fs::rename(&tmp, &path)
         });
         if let Err(err) = write_result {

@@ -1,5 +1,3 @@
-#[cfg(not(windows))]
-use std::os::unix::fs::PermissionsExt;
 use std::{
     fmt,
     fs::{OpenOptions, create_dir_all},
@@ -93,49 +91,84 @@ impl CliConfig {
 
     /// Save configuration to a file at `path`.
     fn save(&self, path: &Path) -> Result<(), CliError> {
-        let file = match OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(path)
+        let parent = path
+            .parent()
+            .filter(|dir| !dir.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        if parent != Path::new(".") {
+            let mut builder = std::fs::DirBuilder::new();
+            builder.recursive(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                builder.mode(0o700);
+            }
+            if let Err(err) = builder.create(parent) {
+                return Err(CliError::ConfigSave(
+                    path.to_string_lossy().to_string(),
+                    format!("Failed to create configuration directory: {err}"),
+                ));
+            }
+        }
+        if std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_symlink()) {
+            return Err(CliError::ConfigSave(
+                path.to_string_lossy().to_string(),
+                "Refusing to overwrite symlinked configuration file".into(),
+            ));
+        }
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("config.json");
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let tmp_path = parent.join(format!(".{file_name}.{}.{nonce}.tmp", std::process::id()));
+        let mut opts = OpenOptions::new();
+        opts.create_new(true).write(true);
+        #[cfg(unix)]
         {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
+        let mut file = match opts.open(&tmp_path) {
             Ok(file) => file,
             Err(err) => {
                 return Err(CliError::ConfigSave(
                     path.to_string_lossy().to_string(),
-                    format!("Failed to open configuration file for saving: {err}"),
+                    format!("Failed to open temporary configuration file for saving: {err}"),
                 ));
             }
         };
-        #[cfg(not(windows))]
-        {
-            debug!("Setting config file permissions.");
-            match file.metadata() {
-                Ok(meta) => {
-                    let mut perms = meta.permissions();
-                    perms.set_mode(0o600);
-                    if let Err(err) = file.set_permissions(perms) {
-                        warn!("Failed to set permissions for the configuration file: {err}");
-                    }
-                }
-                Err(err) => {
-                    warn!("Failed to set permissions for the configuration file: {err}");
-                }
-            }
-            debug!("Config file permissions have been set.");
+        if let Err(err) = serde_json::to_writer(&mut file, &self) {
+            drop(file);
+            let _ = std::fs::remove_file(&tmp_path);
+            return Err(CliError::ConfigSave(
+                path.to_string_lossy().to_string(),
+                err.to_string(),
+            ));
         }
-        match serde_json::to_writer(file, &self) {
-            Ok(()) => debug!(
-                "Configuration file has been saved to {}",
-                path.to_string_lossy()
-            ),
-            Err(err) => {
-                return Err(CliError::ConfigSave(
-                    path.to_string_lossy().to_string(),
-                    err.to_string(),
-                ));
-            }
+        if let Err(err) = std::io::Write::flush(&mut file).and_then(|()| file.sync_all()) {
+            drop(file);
+            let _ = std::fs::remove_file(&tmp_path);
+            return Err(CliError::ConfigSave(
+                path.to_string_lossy().to_string(),
+                format!("Failed to sync configuration file: {err}"),
+            ));
         }
+        drop(file);
+        if let Err(err) = std::fs::rename(&tmp_path, path) {
+            let _ = std::fs::remove_file(&tmp_path);
+            return Err(CliError::ConfigSave(
+                path.to_string_lossy().to_string(),
+                format!("Failed to persist configuration file: {err}"),
+            ));
+        }
+        debug!(
+            "Configuration file has been saved to {}",
+            path.to_string_lossy()
+        );
 
         Ok(())
     }
@@ -294,10 +327,17 @@ struct ApiError {
 
 /// Enroll device.
 async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
-    debug!("Starting enrollment through XGuard Proxy at {base_url}.");
-    let client = Client::builder().cookie_store(true).build()?;
-    let mut url = base_url.clone();
-    url.set_path("/api/v1/enrollment/start");
+    let base = validated_proxy_base_url(base_url.as_str())?;
+    debug!("Starting enrollment through XGuard Proxy at {base}.");
+    let client = Client::builder()
+        .cookie_store(true)
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(HTTP_REQ_TIMEOUT)
+        .timeout(Duration::from_secs(30))
+        .build()?;
+    let url = base
+        .join("api/v1/enrollment/start")
+        .map_err(|err| CliError::XGuardApi(format!("Failed to build enrollment URL: {err}")))?;
     let result = client
         .post(url)
         .json(&EnrollmentStartRequest { token })
@@ -327,8 +367,9 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
     let prvkey = Key::generate();
     let pubkey = prvkey.public_key();
 
-    let mut url = base_url.clone();
-    url.set_path("/api/v1/enrollment/create_device");
+    let url = base
+        .join("api/v1/enrollment/create_device")
+        .map_err(|err| CliError::XGuardApi(format!("Failed to build create_device URL: {err}")))?;
     let result = client
         .post(url)
         .json(&NewDevice {
@@ -384,7 +425,7 @@ const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
 const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 
-fn poll_endpoint_url(proxy_url: &str) -> Result<Url, CliError> {
+fn validated_proxy_base_url(proxy_url: &str) -> Result<Url, CliError> {
     let mut url = Url::parse(proxy_url)
         .map_err(|err| CliError::XGuardApi(format!("Invalid proxy URL ({proxy_url}): {err}")))?;
     let loopback = match url.host_str() {
@@ -414,7 +455,12 @@ fn poll_endpoint_url(proxy_url: &str) -> Result<Url, CliError> {
         let path = format!("{}/", url.path());
         url.set_path(&path);
     }
-    url.join("api/v1/poll")
+    Ok(url)
+}
+
+fn poll_endpoint_url(proxy_url: &str) -> Result<Url, CliError> {
+    validated_proxy_base_url(proxy_url)?
+        .join("api/v1/poll")
         .map_err(|err| CliError::XGuardApi(format!("Failed to build poll URL: {err}")))
 }
 
@@ -794,5 +840,27 @@ async fn main() {
                 },
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validated_proxy_base_url_preserves_prefix_and_rejects_remote_http() {
+        let base = validated_proxy_base_url("https://proxy.example/edge?x=1").unwrap();
+        assert_eq!(
+            base.join("api/v1/enrollment/start").unwrap().as_str(),
+            "https://proxy.example/edge/api/v1/enrollment/start"
+        );
+        assert_eq!(
+            poll_endpoint_url("https://proxy.example/edge?x=1")
+                .unwrap()
+                .as_str(),
+            "https://proxy.example/edge/api/v1/poll"
+        );
+        assert!(validated_proxy_base_url("http://proxy.example").is_err());
+        assert!(validated_proxy_base_url("http://127.0.0.1:8080/edge").is_ok());
     }
 }

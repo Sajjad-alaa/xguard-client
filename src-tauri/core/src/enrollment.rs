@@ -6,17 +6,19 @@
 
 use std::time::Duration;
 
+use reqwest::{Client, Response, StatusCode, Url, redirect::Policy};
+use serde::Serialize;
+use serde_json::json;
+use thiserror::Error;
 use xguard_client_proto::xguard::client_types::{
     CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
     EnrollmentStartResponse,
 };
-use reqwest::{Client, Response, StatusCode, Url};
-use serde::Serialize;
-use serde_json::json;
-use thiserror::Error;
 
 use crate::{
-    proxy::{construct_platform_header, read_error_message},
+    proxy::{
+        construct_platform_header, join_proxy_endpoint, read_error_message, validate_proxy_url,
+    },
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
 
@@ -48,11 +50,21 @@ pub enum EnrollmentError {
 }
 
 /// Holds the enrollment session state.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct EnrollmentSession {
     pub cookie: String,
     pub proxy_url: Url,
     pub client: Client,
+}
+
+impl std::fmt::Debug for EnrollmentSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EnrollmentSession")
+            .field("cookie", &"[REDACTED]")
+            .field("proxy_url", &self.proxy_url)
+            .field("client", &self.client)
+            .finish()
+    }
 }
 
 /// Send a JSON POST request to an enrollment endpoint with the session
@@ -62,12 +74,8 @@ async fn enrollment_post(
     path: &str,
     body: serde_json::Value,
 ) -> Result<Response, EnrollmentError> {
-    let url = session
-        .proxy_url
-        .join(path)
-        .map_err(|e| EnrollmentError::Other {
-            message: format!("Failed to build URL '{path}': {e}"),
-        })?;
+    let url = join_proxy_endpoint(&session.proxy_url, path)
+        .map_err(|message| EnrollmentError::Other { message })?;
     let response = session
         .client
         .post(url)
@@ -123,7 +131,11 @@ pub async fn enrollment_start(
     proxy_url: Url,
     token: String,
 ) -> Result<(EnrollmentSession, EnrollmentStartResponse), EnrollmentError> {
+    validate_proxy_url(&proxy_url).map_err(|reason| EnrollmentError::Other {
+        message: format!("Refusing unsafe proxy URL '{proxy_url}': {reason}"),
+    })?;
     let client = Client::builder()
+        .redirect(Policy::none())
         .connect_timeout(ENROLLMENT_CONNECT_TIMEOUT)
         .timeout(ENROLLMENT_REQ_TIMEOUT)
         .build()
@@ -131,11 +143,8 @@ pub async fn enrollment_start(
             message: format!("Failed to build HTTP client: {e}"),
         })?;
 
-    let url = proxy_url
-        .join("api/v1/enrollment/start")
-        .map_err(|e| EnrollmentError::Other {
-            message: format!("Failed to build enrollment start URL: {e}"),
-        })?;
+    let url = join_proxy_endpoint(&proxy_url, "api/v1/enrollment/start")
+        .map_err(|message| EnrollmentError::Other { message })?;
 
     let response = client
         .post(url)
@@ -303,8 +312,8 @@ mod tests {
     use reqwest::Url;
     use serde_json::json;
     use wiremock::{
-        matchers::{method, path},
         Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
     };
 
     use super::*;
