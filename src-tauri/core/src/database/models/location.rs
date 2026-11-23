@@ -82,6 +82,7 @@ pub enum LocationMfaMethod {
     Biometric = 3,
     MobileApprove = 4,
     Fido2 = 5,
+    Radius = 6,
 }
 
 impl LocationMfaMethod {
@@ -94,6 +95,7 @@ impl LocationMfaMethod {
             Self::Biometric => "biometric",
             Self::MobileApprove => "mobile",
             Self::Fido2 => "fido2",
+            Self::Radius => "radius",
         }
     }
 }
@@ -107,6 +109,7 @@ impl From<ProtoMfaMethod> for LocationMfaMethod {
             ProtoMfaMethod::Biometric => Self::Biometric,
             ProtoMfaMethod::MobileApprove => Self::MobileApprove,
             ProtoMfaMethod::Fido2 => Self::Fido2,
+            ProtoMfaMethod::Radius => Self::Radius,
         }
     }
 }
@@ -120,6 +123,7 @@ impl From<LocationMfaMethod> for ProtoMfaMethod {
             LocationMfaMethod::Biometric => Self::Biometric,
             LocationMfaMethod::MobileApprove => Self::MobileApprove,
             LocationMfaMethod::Fido2 => Self::Fido2,
+            LocationMfaMethod::Radius => Self::Radius,
         }
     }
 }

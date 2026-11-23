@@ -8,6 +8,7 @@ export const mfaMethodIcon: Record<MfaMethodValue, IconKindValue> = {
   [MfaMethod.Totp]: 'mobile-lock',
   [MfaMethod.Biometric]: 'biometric',
   [MfaMethod.Fido2]: 'software-key',
+  [MfaMethod.Radius]: 'lock-closed',
 };
 
 export const OpenIdProvider = {

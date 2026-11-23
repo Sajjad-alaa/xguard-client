@@ -69,6 +69,7 @@ export const MfaMethod = {
   Biometric: 'biometric',
   MobileApprove: 'mobileapprove',
   Fido2: 'fido2',
+  Radius: 'radius',
 } as const;
 
 export type MfaMethodValue = (typeof MfaMethod)[keyof typeof MfaMethod];
