@@ -1399,21 +1399,18 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
     Ok(())
 }
 
+/// Only HTTPS links (or plain HTTP to this machine) without credentials are handed to the system
+/// browser: other schemes (`file:`, custom protocol handlers, ...) could start local programs.
+/// This matches the HTTPS-only rule for Edge addresses in `validate_proxy_url`.
 fn validate_external_link(link: &str) -> Result<Url, Error> {
     let url = Url::parse(link).map_err(|err| Error::CommandError(format!("Invalid URL: {err}")))?;
-    let loopback = match url.host_str() {
-        Some(host) => {
-            host.eq_ignore_ascii_case("localhost")
-                || host
-                    .trim_start_matches('[')
-                    .trim_end_matches(']')
-                    .parse::<std::net::IpAddr>()
-                    .is_ok_and(|ip| ip.is_loopback())
-        }
-        None => false,
-    };
-    let safe_scheme = url.scheme() == "https" || (url.scheme() == "http" && loopback);
-    if !safe_scheme || !url.username().is_empty() || url.password().is_some() {
+    let safe_scheme = url.scheme() == "https"
+        || (url.scheme() == "http" && xguard_client_core::proxy::is_loopback_proxy_url(&url));
+    if !safe_scheme
+        || url.host_str().is_none_or(str::is_empty)
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
         return Err(Error::CommandError(
             "Refusing to open untrusted or non-HTTPS URL".to_string(),
         ));
@@ -4030,6 +4027,8 @@ mod tests {
         assert!(validate_external_link("file:///etc/passwd").is_err());
         assert!(validate_external_link("javascript:alert(1)").is_err());
         assert!(validate_external_link("https://user:pass@example.com").is_err());
+        assert!(validate_external_link("ms-settings:network").is_err());
+        assert!(validate_external_link("smb://server/share").is_err());
     }
 
     #[test]
