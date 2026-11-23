@@ -193,6 +193,7 @@ fn method_name(method: MfaMethod) -> &'static str {
         MfaMethod::Biometric => "mobile biometric authentication",
         MfaMethod::MobileApprove => "mobile app approval",
         MfaMethod::Fido2 => "FIDO2 Security Key",
+        MfaMethod::Radius => "RADIUS",
     }
 }
 

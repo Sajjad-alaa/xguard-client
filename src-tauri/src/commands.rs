@@ -1786,6 +1786,11 @@ enum MfaTaskOutcome {
         next_step: u32,
         token: Option<String>,
     },
+    RadiusChallenge {
+        message: String,
+        push: bool,
+        poll_interval_secs: u32,
+    },
 }
 
 fn cleanup_mfa_route_for_outcome(
@@ -1795,7 +1800,7 @@ fn cleanup_mfa_route_for_outcome(
 ) -> bool {
     let should_cleanup = match outcome {
         Ok(MfaTaskOutcome::Completed { .. }) => true,
-        Ok(MfaTaskOutcome::Advanced { .. }) => false,
+        Ok(MfaTaskOutcome::Advanced { .. } | MfaTaskOutcome::RadiusChallenge { .. }) => false,
         Err(error) => mfa_error_is_terminal(error),
     };
     let Some((token, route)) = session_route.filter(|_| should_cleanup) else {
@@ -1840,6 +1845,13 @@ fn classify_mfa_response(
         Some(mfa_step_result::Outcome::AwaitingExternal(_)) => Err(mfa::MfaError::Other {
             message: "The server returned an unexpected verification state".to_string(),
         }),
+        Some(mfa_step_result::Outcome::RadiusChallenge(challenge)) => {
+            Ok(MfaTaskOutcome::RadiusChallenge {
+                message: challenge.message,
+                push: challenge.push,
+                poll_interval_secs: challenge.poll_interval_secs,
+            })
+        }
         None => Err(mfa::MfaError::Other {
             message: "MFA flow response did not include an outcome".into(),
         }),
@@ -1856,7 +1868,9 @@ fn classify_fido2_response(
             next_step,
             token: Some(token),
         }),
-        outcome @ MfaTaskOutcome::Completed { .. } => Ok(outcome),
+        outcome @ (MfaTaskOutcome::Completed { .. } | MfaTaskOutcome::RadiusChallenge { .. }) => {
+            Ok(outcome)
+        }
     }
 }
 
@@ -1890,6 +1904,7 @@ fn parse_mfa_method(method: &str) -> Result<MfaMethod, String> {
         "biometric" => Ok(MfaMethod::Biometric),
         "mobileapprove" => Ok(MfaMethod::MobileApprove),
         "fido2" => Ok(MfaMethod::Fido2),
+        "radius" => Ok(MfaMethod::Radius),
         other => Err(format!("Unsupported MFA method: {other}")),
     }
 }
@@ -2128,6 +2143,17 @@ pub async fn mfa_finish_code(
             connect_after_mfa(location_id, Some(preshared_key), &handle).await?;
             Ok(None)
         }
+        MfaTaskOutcome::RadiusChallenge {
+            message,
+            push,
+            poll_interval_secs,
+        } => Err(serde_json::json!({
+            "kind": "radius_challenge",
+            "message": message,
+            "push": push,
+            "pollIntervalSecs": poll_interval_secs,
+        })
+        .to_string()),
     }
 }
 
@@ -2193,6 +2219,24 @@ where
                 let _ = listen_handle.emit(
                     advanced_event.into(),
                     MfaStepAdvancedPayload { next_step, token },
+                );
+            }
+            Ok(MfaTaskOutcome::RadiusChallenge {
+                message,
+                push,
+                poll_interval_secs,
+            }) => {
+                let _ = listen_handle.emit(
+                    error_event.into(),
+                    MfaErrorPayload {
+                        error: serde_json::json!({
+                            "kind": "radius_challenge",
+                            "message": message,
+                            "push": push,
+                            "pollIntervalSecs": poll_interval_secs,
+                        })
+                        .to_string(),
+                    },
                 );
             }
             Err(err) => {
@@ -3799,6 +3843,26 @@ mod tests {
         assert!(matches!(
             classify_mfa_response(response, MfaContract::MultiStep),
             Ok(MfaTaskOutcome::Completed { preshared_key }) if preshared_key == "completed-key"
+        ));
+    }
+
+    #[test]
+    fn test_classify_mfa_response_radius_challenge() {
+        let response = finish_response(Some(mfa_step_result::Outcome::RadiusChallenge(
+            xguard_client_core::proto::client_types::MfaRadiusChallenge {
+                message: "Enter SMS code".into(),
+                push: true,
+                poll_interval_secs: 2,
+            },
+        )));
+
+        assert!(matches!(
+            classify_mfa_response(response, MfaContract::MultiStep),
+            Ok(MfaTaskOutcome::RadiusChallenge {
+                message,
+                push: true,
+                poll_interval_secs: 2,
+            }) if message == "Enter SMS code"
         ));
     }
 

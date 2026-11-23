@@ -667,7 +667,8 @@ pub async fn poll_openid_mfa(
                             Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {}
                             Some(
                                 mfa_step_result::Outcome::Advanced(_)
-                                | mfa_step_result::Outcome::Completed(_),
+                                | mfa_step_result::Outcome::Completed(_)
+                                | mfa_step_result::Outcome::RadiusChallenge(_),
                             ) => return Ok(response),
                             None => {
                                 return Err(MfaError::Other {

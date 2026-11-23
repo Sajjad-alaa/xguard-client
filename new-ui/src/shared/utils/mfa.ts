@@ -18,6 +18,7 @@ const mfaMethodLabels: Record<MfaMethodValue, string> = {
   [MfaMethod.Totp]: 'Authenticator app',
   [MfaMethod.Biometric]: 'Mobile Biometric Authentication',
   [MfaMethod.Fido2]: 'FIDO2 Security Key',
+  [MfaMethod.Radius]: 'RADIUS',
 };
 
 export type OpenIdInstance = Pick<
@@ -47,6 +48,7 @@ export const mfaMethodApiValues: Record<MfaMethodValue, string> = {
   [MfaMethod.Totp]: 'Totp',
   [MfaMethod.Biometric]: 'Biometric',
   [MfaMethod.Fido2]: 'Fido2',
+  [MfaMethod.Radius]: 'Radius',
 };
 
 export const mfaToApi = (factor: MfaMethodValue): string => mfaMethodApiValues[factor];
