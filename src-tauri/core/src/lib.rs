@@ -36,6 +36,7 @@ pub mod proxy;
 pub mod service_locations;
 #[cfg(test)]
 mod test_helpers;
+pub mod updates;
 pub mod version;
 pub mod wg_config;
 

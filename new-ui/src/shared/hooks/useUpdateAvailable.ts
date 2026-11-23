@@ -2,7 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import { getVersion } from '@tauri-apps/api/app';
 
 import { getLatestAppVersionQueryOptions } from '../rust-api/query';
+import type { NewAppVersionInfo } from '../rust-api/types';
 import { isVersionGreater } from '../utils/compareVersions';
+
+export const isUpdateAvailable = (
+  latest: NewAppVersionInfo | null | undefined,
+  currentVersion: string | undefined,
+): boolean =>
+  latest !== undefined &&
+  latest !== null &&
+  currentVersion !== undefined &&
+  isVersionGreater(latest.version, currentVersion);
 
 export const useUpdateAvailable = (): boolean => {
   const { data: latest } = useQuery(getLatestAppVersionQueryOptions);
@@ -11,9 +21,5 @@ export const useUpdateAvailable = (): boolean => {
     queryFn: () => getVersion(),
   });
 
-  return (
-    latest !== undefined &&
-    currentVersion !== undefined &&
-    isVersionGreater(latest.version, currentVersion)
-  );
+  return isUpdateAvailable(latest, currentVersion);
 };

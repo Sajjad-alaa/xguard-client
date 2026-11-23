@@ -1,8 +1,8 @@
 name: "Build app and create release"
+# Needs the upstream self-hosted runners. XGuard tags are built by release-installers.yaml on
+# GitHub-hosted runners, so this one only runs on request.
 on:
-  push:
-    tags:
-      - v*.*.*
+  workflow_dispatch:
 env:
   SQLX_OFFLINE: "1"
 

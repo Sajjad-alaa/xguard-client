@@ -127,7 +127,8 @@ const takePendingAddInstance = (): Promise<AddInstanceEventPayload | null> =>
 
 const getPlatformHeader = (): Promise<string> => invoke(TauriCommand.GetPlatformHeader);
 
-const getLatestAppVersion = (): Promise<NewAppVersionInfo> =>
+/** The newest release when it is newer than this client; `null` when up to date or unknown. */
+const getLatestAppVersion = (): Promise<NewAppVersionInfo | null> =>
   invoke(TauriCommand.GetLatestAppVersion);
 
 const getClientBuildVersion = (): Promise<string> =>

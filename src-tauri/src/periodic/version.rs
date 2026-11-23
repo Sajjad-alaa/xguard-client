@@ -5,6 +5,7 @@ use tokio::time::interval;
 
 use crate::{appstate::AppState, commands::get_latest_app_version, events::EventKey};
 
+// The checker contacts GitHub at most once per day; asking more often reuses its result.
 const INTERVAL_IN_SECONDS: Duration = Duration::from_hours(12);
 
 pub async fn poll_version(app_handle: AppHandle) {
@@ -28,13 +29,10 @@ pub async fn poll_version(app_handle: AppHandle) {
         };
         if let Some(app_config) = config_option {
             if app_config.check_for_updates {
-                let response = get_latest_app_version(app_handle.clone()).await;
-                if let Ok(result) = response {
+                // Failures are logged (at debug level) by the checker and mean "no update".
+                if let Ok(Some(result)) = get_latest_app_version(app_handle.clone()).await {
                     debug!("Fetched latest application version info: {result:?}");
                     let _ = app_handle.emit(EventKey::AppVersionFetch.into(), &result);
-                } else {
-                    let err = response.err().unwrap();
-                    error!("Error while fetching latest application version: {err}");
                 }
             } else {
                 debug!(
