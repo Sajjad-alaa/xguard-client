@@ -29,7 +29,7 @@ const UpdateAvailable = ({ info }: { info: NewAppVersionInfo }) => (
         onClick={() => openUrl(info.update_url)}
       />
       <Button
-        text="Read more in Blog"
+        text="Release notes"
         variant={ButtonVariant.Secondary}
         iconRight={IconKind.OpenInNewWindow}
         onClick={() => openUrl(info.release_notes_url)}

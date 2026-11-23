@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::HashMap, env, future::Future, str::FromStr, sync::Arc};
+use std::{future::Future, str::FromStr, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 use reqwest::Url;
@@ -25,6 +25,7 @@ use xguard_client_core::{
     mfa_contract::MfaContract,
     provisioning::{ProvisioningConfig, mark_consumed},
     service_locations::{remove_service_locations, sync_service_locations},
+    updates::{AppVersionInfo, UPDATE_CHECKER},
 };
 #[cfg(not(target_os = "macos"))]
 use xguard_client_proto::xguard::client::v1::RemoveInterfaceRequest;
@@ -33,8 +34,6 @@ use xguard_client_proto::xguard::client_types::{
     EnrollmentSettings, InitialUserInfo, InstanceInfo as ProtoInstanceInfo,
     MfaConfigAuthorizeResponse, MfaFido2Assertion, MfaMethod, mfa_step_result,
 };
-
-const UPDATE_URL: &str = "https://pkgs.xguard.local/api/update/check";
 
 #[cfg(not(target_os = "macos"))]
 use crate::utils::execute_command;
@@ -1427,17 +1426,6 @@ pub fn open_link(link: &str) -> Result<(), Error> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AppVersionInfo {
-    pub version: String,
-    pub release_date: String,
-    pub release_notes_url: String,
-    pub update_url: String,
-    pub summary: Option<String>,
-}
-
-const PRODUCT_NAME: &str = "xguard-client";
-
 fn reported_app_version(package_version: &str) -> String {
     xguard_client_core::version::select_reported_app_version(
         package_version,
@@ -1450,43 +1438,13 @@ pub fn get_client_build_version() -> String {
     reported_app_version(xguard_client_core::version::PKG_VERSION)
 }
 
+/// The newest XGuard client release when it is newer than this one, from the GitHub releases
+/// API (at most one request per day; failures mean "no update", see
+/// [`xguard_client_core::updates`]).
 #[tauri::command(async)]
-pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo, Error> {
+pub async fn get_latest_app_version(handle: AppHandle) -> Result<Option<AppVersionInfo>, Error> {
     let app_version = reported_app_version(&handle.package_info().version.to_string());
-    let operating_system = env::consts::OS;
-
-    let mut request_data = HashMap::new();
-    request_data.insert("product", PRODUCT_NAME);
-    request_data.insert("client_version", &app_version);
-    request_data.insert("operating_system", operating_system);
-
-    debug!(
-        "Fetching latest application version, client metadata: current version: {app_version} \
-        and operating system: {operating_system}"
-    );
-
-    let client = reqwest::Client::new();
-    let res = client.post(UPDATE_URL).json(&request_data).send().await;
-
-    if let Ok(response) = res {
-        let response_json = response.json::<AppVersionInfo>().await;
-
-        let response = response_json.map_err(|err| {
-            error!("Failed to deserialize latest application version response {err}");
-            Error::CommandError(err.to_string())
-        })?;
-
-        info!(
-            "The latest release version of the application available for download is {}, it was \
-            released on {}.",
-            response.version, response.release_date
-        );
-        Ok(response)
-    } else {
-        let err = res.err().unwrap();
-        error!("Failed to fetch latest application version {err}");
-        Err(Error::CommandError(err.to_string()))
-    }
+    Ok(UPDATE_CHECKER.latest(&app_version).await)
 }
 
 #[tauri::command]

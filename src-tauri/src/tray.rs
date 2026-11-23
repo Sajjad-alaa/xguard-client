@@ -23,7 +23,8 @@ use crate::{
     ConnectionType,
 };
 
-const SUBSCRIBE_UPDATES_LINK: &str = "https://xguard.local/newsletter";
+// GitHub lets users watch releases ("Watch" > "Custom" > "Releases").
+const SUBSCRIBE_UPDATES_LINK: &str = "https://github.com/Sajjad-alaa/xguard-client/releases";
 const JOIN_COMMUNITY_LINK: &str = "https://github.com/Sajjad-alaa/xguard-core/discussions/new/choose";
 const FOLLOW_US_LINK: &str = "https://floss.social/@xguard";
 
