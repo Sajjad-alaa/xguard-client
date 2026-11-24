@@ -7,6 +7,45 @@ export type ParsedMfaError = {
   status?: number;
 };
 
+/** RADIUS Access-Challenge payload returned via the finish-code command. */
+export type RadiusChallengePayload = {
+  kind: 'radius_challenge';
+  message: string;
+  push: boolean;
+  pollIntervalSecs: number;
+};
+
+/** Parses a RADIUS Access-Challenge response, or returns null for other errors. */
+export const parseRadiusChallenge = (err: unknown): RadiusChallengePayload | null => {
+  try {
+    const parsed = JSON.parse(String(err)) as Partial<RadiusChallengePayload>;
+    if (parsed && parsed.kind === 'radius_challenge') {
+      return {
+        kind: 'radius_challenge',
+        message: typeof parsed.message === 'string' ? parsed.message : '',
+        push: Boolean(parsed.push),
+        pollIntervalSecs:
+          typeof parsed.pollIntervalSecs === 'number' && parsed.pollIntervalSecs > 0
+            ? parsed.pollIntervalSecs
+            : 2,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+/** Returns true when a RADIUS push poll is still awaiting user approval. */
+export const isRadiusAwaiting = (err: unknown): boolean => {
+  try {
+    const parsed = JSON.parse(String(err)) as { kind?: unknown };
+    return parsed?.kind === 'radius_awaiting';
+  } catch {
+    return false;
+  }
+};
+
 /** Parses a JSON MFA error, or returns null for plain text. */
 export const parseMfaError = (err: unknown): ParsedMfaError | null => {
   try {
@@ -22,7 +61,24 @@ export const mfaErrorMessage = (err: unknown): string => {
   if (parsed?.type === 'mobile_client_outdated') {
     return 'Your XGuard mobile app is out of date.\nUpgrade to approve this connection.';
   }
-  return parsed?.message ?? String(err);
+  const raw = parsed?.message ?? String(err);
+  const lower = raw.toLowerCase();
+  if (
+    parsed?.type === 'device_limit_reached' ||
+    lower.includes('device_limit_reached') ||
+    lower.includes('device limit reached')
+  ) {
+    return 'Maximum number of registered devices reached for your account. Remove an unused device or contact your administrator.';
+  }
+  if (
+    parsed?.type === 'connection_limit_reached' ||
+    lower.includes('connection_limit_reached') ||
+    lower.includes('concurrent connection limit') ||
+    lower.includes('connection limit reached')
+  ) {
+    return 'Maximum number of concurrent VPN connections reached for your account. Disconnect another device or contact your administrator.';
+  }
+  return raw;
 };
 
 /** Returns true when MFA was rejected by the device posture check. */

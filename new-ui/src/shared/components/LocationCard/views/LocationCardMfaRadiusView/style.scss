@@ -1,0 +1,39 @@
+.location-card-mfa-radius-view {
+  .radius-push-status {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    font: var(--t-body-sm);
+    color: var(--fg-white-80, rgba(255, 255, 255, 0.85));
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #3b82f6;
+      flex-shrink: 0;
+      animation: radius-card-pulse 1.5s ease-in-out infinite;
+    }
+  }
+
+  .radius-trigger-row {
+    display: flex;
+    justify-content: flex-start;
+  }
+}
+
+@keyframes radius-card-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}

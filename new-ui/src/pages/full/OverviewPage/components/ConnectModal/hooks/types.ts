@@ -6,6 +6,7 @@ export const ConnectModalView = {
   MfaOidc: 'mfa-oidc',
   MfaMobile: 'mfa-mobile',
   MfaFido2: 'mfa-fido2',
+  MfaRadius: 'mfa-radius',
   MfaSettings: 'mfa-settings',
   PostureCheckFail: 'posture-check-fail',
   ConnectionError: 'connection-error',
@@ -23,6 +24,8 @@ export const mfaMethodToConnectModalView = (
       return ConnectModalView.MfaMobile;
     case MfaMethod.Fido2:
       return ConnectModalView.MfaFido2;
+    case MfaMethod.Radius:
+      return ConnectModalView.MfaRadius;
     default:
       return ConnectModalView.MfaTotp;
   }
@@ -34,6 +37,7 @@ export const ConnectModalTitle: Record<ConnectModalViewValue, string> = {
   [ConnectModalView.MfaOidc]: 'Multi-factor authentication',
   [ConnectModalView.MfaMobile]: 'Multi-factor authentication',
   [ConnectModalView.MfaFido2]: 'Multi-factor authentication',
+  [ConnectModalView.MfaRadius]: 'RADIUS authentication',
   [ConnectModalView.MfaSettings]: 'Change MFA Method',
   [ConnectModalView.PostureCheckFail]: 'Access denied',
   [ConnectModalView.ConnectionError]: 'Connection error',

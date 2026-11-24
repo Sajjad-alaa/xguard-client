@@ -2050,7 +2050,7 @@ pub async fn mfa_finish_code(
     instance_id: Id,
     location_id: Id,
     token: String,
-    code: String,
+    code: Option<String>,
     step_attempt_id: Option<String>,
     state: State<'_, AppState>,
     handle: AppHandle,
@@ -2062,13 +2062,14 @@ pub async fn mfa_finish_code(
         .ok_or_else(|| "Instance not found".to_string())?;
     let route = get_mfa_auth_session(&state, &token, instance_id, location_id)?;
     let step_attempt_id = mfa_route_step_attempt_id(&route, step_attempt_id)?;
+    let is_poll = code.is_none();
     let response = match mfa::mfa_finish(
         route.contract,
         route.proxy_url.clone(),
         mfa::MfaFinishRequest {
             token: token.clone(),
             step_attempt_id,
-            submission: Some(mfa::MfaFinishSubmission::Code(code)),
+            submission: code.map(mfa::MfaFinishSubmission::Code),
         },
     )
     .await
@@ -2081,6 +2082,16 @@ pub async fn mfa_finish_code(
             return Err(err_to_json(error));
         }
     };
+
+    if is_poll
+        && matches!(
+            &response,
+            mfa::MfaFinishResponse::MultiStep { result }
+                if matches!(result.outcome, Some(mfa_step_result::Outcome::AwaitingExternal(_)))
+        )
+    {
+        return Err(serde_json::json!({ "kind": "radius_awaiting" }).to_string());
+    }
 
     let outcome = match classify_mfa_response(response, route.contract) {
         Ok(outcome) => outcome,

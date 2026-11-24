@@ -226,7 +226,7 @@ const mfaFinishCode = (
   instanceId: number,
   locationId: number,
   token: string,
-  code: string,
+  code: string | null,
   stepAttemptId: string | null,
 ): Promise<number | null> =>
   invoke(TauriCommand.MfaFinishCode, {

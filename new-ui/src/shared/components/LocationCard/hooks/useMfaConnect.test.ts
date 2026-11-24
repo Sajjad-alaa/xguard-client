@@ -119,5 +119,52 @@ describe('useMfaConnect', () => {
       await waitFor(() => expect(onFailure).toHaveBeenCalledWith(err));
       expect(result.current.startError).toBeNull();
     });
+
+    it('captures RADIUS Access-Challenge and handles push polling without failing the session', async () => {
+      mocks.mfaFinishCode
+        .mockRejectedValueOnce(
+          JSON.stringify({
+            kind: 'radius_challenge',
+            message: 'Approve push on your phone',
+            push: true,
+            pollIntervalSecs: 2,
+          }),
+        )
+        .mockRejectedValueOnce(JSON.stringify({ kind: 'radius_awaiting' }))
+        .mockResolvedValueOnce(null);
+
+      const onFailure = vi.fn();
+      const onConnected = vi.fn();
+      const setMfaToken = vi.fn();
+      const { result } = renderHook(() =>
+        useMfaConnect(location, MfaMethod.Radius, {
+          stepPlan: [MfaMethod.Radius],
+          mfaToken: null,
+          setMfaToken,
+          onStepAdvanced: vi.fn(),
+          onConnected,
+          onFailure,
+        }),
+      );
+      await waitFor(() => expect(result.current.token).toBe('session-token'));
+
+      await act(async () => result.current.verifyCode(''));
+      expect(result.current.radiusChallenge).toEqual({
+        kind: 'radius_challenge',
+        message: 'Approve push on your phone',
+        push: true,
+        pollIntervalSecs: 2,
+      });
+      expect(onFailure).not.toHaveBeenCalled();
+      expect(result.current.token).toBe('session-token');
+
+      await act(async () => result.current.verifyCode(null));
+      expect(onFailure).not.toHaveBeenCalled();
+      expect(onConnected).not.toHaveBeenCalled();
+
+      await act(async () => result.current.verifyCode(null));
+      expect(onConnected).toHaveBeenCalledTimes(1);
+      expect(result.current.radiusChallenge).toBeNull();
+    });
   });
 });
