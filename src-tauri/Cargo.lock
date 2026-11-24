@@ -8842,7 +8842,7 @@ dependencies = [
 
 [[package]]
 name = "xguard-cli"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "base64 0.23.1",
  "chrono",
@@ -8871,7 +8871,7 @@ dependencies = [
 
 [[package]]
 name = "xguard-client"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "async-stream",
  "auto-launch",
@@ -8940,7 +8940,7 @@ dependencies = [
 
 [[package]]
 name = "xguard-client-common"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "nix",
  "vergen-git2",
@@ -8948,7 +8948,7 @@ dependencies = [
 
 [[package]]
 name = "xguard-client-core"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "base64 0.23.1",
  "block2",
@@ -8993,7 +8993,7 @@ dependencies = [
 
 [[package]]
 name = "xguard-client-proto"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "prost",
  "serde",
@@ -9009,7 +9009,7 @@ dependencies = [
 
 [[package]]
 name = "xguard-client-service"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -9036,7 +9036,7 @@ dependencies = [
 
 [[package]]
 name = "xguard-dg"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "clap",
  "dirs-next",
