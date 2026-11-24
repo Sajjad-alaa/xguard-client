@@ -19,6 +19,8 @@ futures-util.workspace = true
 hyper-util.workspace = true
 log.workspace = true
 os_info.workspace = true
+# Reads the macOS install history (XML or binary property list) for the update age.
+plist = "1.7"
 prost.workspace = true
 reqwest.workspace = true
 rust-ini.workspace = true

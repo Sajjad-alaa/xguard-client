@@ -14,6 +14,12 @@ use tokio::{io::AsyncReadExt, process::Command, time::timeout};
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
 /// Longest output read from a probe command.
 const MAX_OUTPUT: u64 = 64 * 1024;
+/// Most bytes read from the end of a package log.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+const MAX_LOG_TAIL: u64 = 1024 * 1024;
+/// Most `/proc` entries looked at.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+const MAX_PROCESSES: usize = 65_536;
 
 /// Runs `program` with fixed `args` and returns stdout and stderr, or `None` on failure.
 #[allow(dead_code)]
@@ -25,6 +31,16 @@ pub(crate) async fn run_with_timeout(
     program: impl AsRef<std::ffi::OsStr>,
     args: &'static [&'static str],
     limit: Duration,
+) -> Option<String> {
+    run_capped(program, args, limit, MAX_OUTPUT).await
+}
+
+/// Like [`run_with_timeout`] with a different output cap, for list commands (`rpm -qa`).
+pub(crate) async fn run_capped(
+    program: impl AsRef<std::ffi::OsStr>,
+    args: &'static [&'static str],
+    limit: Duration,
+    max_output: u64,
 ) -> Option<String> {
     let program = program.as_ref();
     let mut command = Command::new(program);
@@ -45,7 +61,7 @@ pub(crate) async fn run_with_timeout(
     let work = async {
         let mut out = Vec::new();
         let mut err = Vec::new();
-        let cap = MAX_OUTPUT + 1;
+        let cap = max_output + 1;
         let mut out_reader = (&mut stdout).take(cap);
         let mut err_reader = (&mut stderr).take(cap);
         let (read_out, read_err) = tokio::join!(
@@ -55,7 +71,7 @@ pub(crate) async fn run_with_timeout(
         drop((out_reader, err_reader));
         read_out.ok()?;
         read_err.ok()?;
-        if out.len() as u64 > MAX_OUTPUT || err.len() as u64 > MAX_OUTPUT {
+        if out.len() as u64 > max_output || err.len() as u64 > max_output {
             drop((stdout, stderr));
             let _ = child.start_kill();
             let _ = child.wait().await;
@@ -113,6 +129,102 @@ pub(crate) async fn platform_facts() -> PlatformFacts {
         Some(text)
     }
 
+    /// The last `MAX_LOG_TAIL` bytes of a log (newest entries are at the end), starting at a
+    /// line boundary.
+    fn read_tail(path: &Path) -> Option<String> {
+        use std::io::{Read, Seek, SeekFrom};
+        let mut file = fs::File::open(path).ok()?;
+        let len = file.metadata().ok()?.len();
+        let start = len.saturating_sub(MAX_LOG_TAIL);
+        file.seek(SeekFrom::Start(start)).ok()?;
+        let mut bytes = Vec::new();
+        file.take(MAX_LOG_TAIL).read_to_end(&mut bytes).ok()?;
+        let text = String::from_utf8_lossy(&bytes).into_owned();
+        Some(if start > 0 {
+            text.split_once('\n')
+                .map(|(_, rest)| rest.to_owned())
+                .unwrap_or_default()
+        } else {
+            text
+        })
+    }
+
+    /// Names (`comm`) of the processes owned by system accounts (uid below 1000), so a
+    /// process a user starts under a well-known name does not count. `None` when `/proc`
+    /// cannot be read.
+    fn system_processes() -> Option<Vec<(u32, String)>> {
+        let entries = fs::read_dir("/proc").ok()?;
+        Some(
+            entries
+                .flatten()
+                .filter(|e| {
+                    e.file_name()
+                        .to_string_lossy()
+                        .bytes()
+                        .all(|b| b.is_ascii_digit())
+                })
+                .take(MAX_PROCESSES)
+                .filter_map(|e| {
+                    let uid = fs::metadata(e.path()).ok()?.uid();
+                    (uid < 1000).then_some(())?;
+                    let comm = fs::read_to_string(e.path().join("comm")).ok()?;
+                    Some((uid, comm.trim().to_owned()))
+                })
+                .collect(),
+        )
+    }
+
+    fn running_as_root(processes: &[(u32, String)], name: &str) -> bool {
+        processes
+            .iter()
+            .any(|(uid, comm)| *uid == 0 && comm == name)
+    }
+
+    fn domain_joined(processes: &[(u32, String)]) -> bool {
+        parse::linux_domain_joined(parse::LinuxDirectory {
+            host_keytab: fs::metadata("/etc/krb5.keytab").is_ok_and(|m| m.is_file() && m.len() > 0),
+            ipa_client: fs::metadata("/etc/ipa/default.conf").is_ok_and(|m| m.is_file()),
+            sssd_running: running_as_root(processes, "sssd"),
+            winbind_running: running_as_root(processes, "winbindd"),
+        })
+    }
+
+    /// The newest package update, by package manager: apt/dpkg logs on Debian and Ubuntu (with
+    /// the newest `/var/lib/dpkg/info` change when the logs were rotated since), the RPM
+    /// database on Fedora, RHEL, SUSE and other RPM systems, the pacman log on Arch.
+    async fn last_update() -> Option<chrono::NaiveDateTime> {
+        if Path::new("/var/lib/dpkg/status").exists() {
+            let apt = read_tail(Path::new("/var/log/apt/history.log"))
+                .and_then(|log| parse::apt_last_upgrade(&log));
+            let dpkg = read_tail(Path::new("/var/log/dpkg.log"))
+                .and_then(|log| parse::dpkg_last_upgrade(&log));
+            return apt.max(dpkg).or_else(newest_dpkg_change);
+        }
+        if Path::new("/usr/bin/rpm").exists() {
+            let output = run_capped(
+                "/usr/bin/rpm",
+                &["-qa", "--qf", "%{INSTALLTIME}\\n"],
+                COMMAND_TIMEOUT,
+                1024 * 1024,
+            )
+            .await?;
+            return parse::rpm_newest_install(&output);
+        }
+        read_tail(Path::new("/var/log/pacman.log")).and_then(|log| parse::pacman_last_upgrade(&log))
+    }
+
+    /// When a package was last unpacked (`/var/lib/dpkg/info/*.list` change times, local time).
+    fn newest_dpkg_change() -> Option<chrono::NaiveDateTime> {
+        let newest = fs::read_dir("/var/lib/dpkg/info")
+            .ok()?
+            .flatten()
+            .take(50_000)
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".list"))
+            .filter_map(|e| e.metadata().ok()?.modified().ok())
+            .max()?;
+        Some(chrono::DateTime::<chrono::Local>::from(newest).naive_local())
+    }
+
     fn disk_encrypted() -> Option<bool> {
         let (major, minor, source) = parse::root_mount(&read(Path::new("/proc/self/mountinfo"))?)?;
         let block = if major == 0 {
@@ -125,22 +237,7 @@ pub(crate) async fn platform_facts() -> PlatformFacts {
         Some(parse::is_dm_crypt(&block))
     }
 
-    fn firewalld_running() -> bool {
-        let Ok(entries) = fs::read_dir("/proc") else {
-            return false;
-        };
-        entries.flatten().any(|e| {
-            e.file_name()
-                .to_string_lossy()
-                .bytes()
-                .all(|b| b.is_ascii_digit())
-                && fs::metadata(e.path()).is_ok_and(|meta| meta.uid() == 0)
-                && fs::read_to_string(e.path().join("comm"))
-                    .is_ok_and(|comm| comm.trim() == "firewalld")
-        })
-    }
-
-    fn firewall_enabled() -> Option<bool> {
+    fn firewall_enabled(processes: &[(u32, String)]) -> Option<bool> {
         let ufw = read(Path::new("/etc/ufw/ufw.conf")).and_then(|conf| parse::ufw_enabled(&conf));
         let nftables = [
             "/etc/systemd/system/multi-user.target.wants/nftables.service",
@@ -148,7 +245,7 @@ pub(crate) async fn platform_facts() -> PlatformFacts {
         ]
         .iter()
         .any(|path| fs::metadata(path).is_ok());
-        if ufw == Some(true) || nftables || firewalld_running() {
+        if ufw == Some(true) || nftables || running_as_root(processes, "firewalld") {
             Some(true)
         } else {
             ufw
@@ -179,11 +276,22 @@ pub(crate) async fn platform_facts() -> PlatformFacts {
         parse::gnome_idle_delay_nonzero(&idle)
     }
 
+    let processes = tokio::task::spawn_blocking(system_processes)
+        .await
+        .ok()
+        .flatten();
+    let (screen_lock_enabled, last_update) = tokio::join!(screen_lock_enabled(), last_update());
+    let now = chrono::Local::now().naive_local();
     PlatformFacts {
         kernel_version: read(Path::new("/proc/sys/kernel/osrelease")).map(|v| v.trim().to_string()),
         disk_encrypted: disk_encrypted(),
-        firewall_enabled: firewall_enabled(),
-        screen_lock_enabled: screen_lock_enabled().await,
+        firewall_enabled: firewall_enabled(processes.as_deref().unwrap_or_default()),
+        screen_lock_enabled,
+        antivirus_enabled: processes.as_ref().map(|processes| {
+            parse::linux_security_agent_running(processes.iter().map(|(_, comm)| comm.as_str()))
+        }),
+        domain_joined: processes.as_deref().map(domain_joined),
+        security_update_age_days: last_update.and_then(|then| parse::age_days(then, now)),
         ..Default::default()
     }
 }
@@ -192,7 +300,25 @@ pub(crate) async fn platform_facts() -> PlatformFacts {
 pub(crate) async fn platform_facts() -> PlatformFacts {
     use super::parse;
 
-    let (filevault, firewall, screen_lock, sip) = tokio::join!(
+    /// Readable by everyone; can grow over the years, so it is capped.
+    const INSTALL_HISTORY: &str = "/Library/Receipts/InstallHistory.plist";
+    const MAX_INSTALL_HISTORY: u64 = 32 * 1024 * 1024;
+
+    fn last_os_update() -> Option<chrono::NaiveDateTime> {
+        use std::io::Read;
+        let mut bytes = Vec::new();
+        std::fs::File::open(INSTALL_HISTORY)
+            .ok()?
+            .take(MAX_INSTALL_HISTORY + 1)
+            .read_to_end(&mut bytes)
+            .ok()?;
+        if bytes.len() as u64 > MAX_INSTALL_HISTORY {
+            return None;
+        }
+        parse::macos_last_os_update(&bytes)
+    }
+
+    let (filevault, firewall, screen_lock, sip, processes, ad, ldap, last_update) = tokio::join!(
         run("/usr/bin/fdesetup", &["status"]),
         run(
             "/usr/libexec/ApplicationFirewall/socketfilterfw",
@@ -200,14 +326,36 @@ pub(crate) async fn platform_facts() -> PlatformFacts {
         ),
         run("/usr/sbin/sysadminctl", &["-screenLock", "status"]),
         run("/usr/bin/csrutil", &["status"]),
+        run_capped(
+            "/bin/ps",
+            &["-axo", "uid=,comm="],
+            COMMAND_TIMEOUT,
+            1024 * 1024
+        ),
+        run("/usr/sbin/dsconfigad", &["-show"]),
+        run("/usr/bin/dscl", &["localhost", "-list", "/LDAPv3"]),
+        async {
+            tokio::task::spawn_blocking(last_os_update)
+                .await
+                .ok()
+                .flatten()
+        },
     );
+    let now = chrono::Utc::now().naive_utc();
     PlatformFacts {
         kernel_version: None,
         disk_encrypted: filevault.as_deref().and_then(parse::filevault_on),
         firewall_enabled: firewall.as_deref().and_then(parse::macos_firewall_enabled),
         screen_lock_enabled: screen_lock.as_deref().and_then(parse::macos_screen_lock),
         device_integrity: sip.as_deref().and_then(parse::sip_enabled),
-        ..Default::default()
+        antivirus_enabled: processes
+            .as_deref()
+            .and_then(parse::macos_security_agent_running),
+        domain_joined: parse::macos_domain_joined(
+            ad.as_deref().and_then(parse::macos_ad_bound),
+            ldap.as_deref().and_then(parse::macos_ldap_bound),
+        ),
+        security_update_age_days: last_update.and_then(|then| parse::age_days(then, now)),
     }
 }
 
