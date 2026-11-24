@@ -8964,6 +8964,7 @@ dependencies = [
  "objc2-foundation",
  "objc2-network-extension",
  "os_info",
+ "plist",
  "prost",
  "reqwest 0.13.5",
  "rust-ini",

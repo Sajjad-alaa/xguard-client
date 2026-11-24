@@ -30,6 +30,9 @@ use crate::{
 mod collect;
 pub mod parse;
 
+/// The set of facts this client reports (`DevicePostureFacts.facts_revision`): 2 adds
+/// antivirus, directory membership and update age on macOS and Linux.
+pub const FACTS_REVISION: u32 = 2;
 /// Upper bound for collecting all facts.
 pub const COLLECTION_TIMEOUT: Duration = Duration::from_secs(20);
 /// Edge error code of a posture refusal.
@@ -87,6 +90,7 @@ pub async fn collect() -> DevicePostureFacts {
         security_update_age_days: platform.security_update_age_days,
         security_patch_date: None,
         collected_at: Utc::now().timestamp(),
+        facts_revision: FACTS_REVISION,
     };
     debug!("Collected device posture: {facts:?}");
     facts
@@ -299,8 +303,14 @@ mod tests {
         assert_eq!(facts.client_version, PKG_VERSION);
         assert_ne!(facts.os, PostureOs::Unspecified as i32);
         assert!(facts.collected_at > 0);
+        assert_eq!(facts.facts_revision, FACTS_REVISION);
         #[cfg(target_os = "linux")]
-        assert!(facts.kernel_version.is_some());
+        {
+            assert!(facts.kernel_version.is_some());
+            // `/proc` is readable, so the process-based facts are known (true or false).
+            assert!(facts.antivirus_enabled.is_some());
+            assert!(facts.domain_joined.is_some());
+        }
     }
 
     fn facts() -> DevicePostureFacts {
