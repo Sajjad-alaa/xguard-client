@@ -7,18 +7,24 @@ import {
   isConnectFailure,
   isInvalidCode,
   isMfaPostureError,
+  isRadiusAwaiting,
   isServiceUnavailable,
   isSessionExpired,
   isStaleAttempt,
   isTimeout,
   MfaFailureText,
   mfaErrorMessage,
+  parseRadiusChallenge,
+  type RadiusChallengePayload,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { LocationInfo, MfaMethod, MfaMethodValue } from '../../../rust-api/types';
 import { isPresent } from '../../../utils/isPresent';
 
-type CodeMfaMethod = typeof MfaMethod.Totp | typeof MfaMethod.Email;
+type CodeMfaMethod =
+  | typeof MfaMethod.Totp
+  | typeof MfaMethod.Email
+  | typeof MfaMethod.Radius;
 
 type UseMfaConnectOptions = {
   debounceMs?: number;
@@ -63,6 +69,9 @@ export const useMfaConnect = (
   const [startError, setStartError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [radiusChallenge, setRadiusChallenge] = useState<RadiusChallengePayload | null>(
+    null,
+  );
   const verifyingRef = useRef(false);
 
   const { data: instances } = useQuery(getInstancesQueryOptions);
@@ -121,12 +130,15 @@ export const useMfaConnect = (
   }, [instance]);
 
   const verifyCode = useCallback(
-    async (code: string) => {
+    async (code: string | null) => {
       if (isStarting || !token || !instance || verifyingRef.current) return;
 
+      const isPoll = code === null;
       verifyingRef.current = true;
-      setIsVerifying(true);
-      setVerifyError(null);
+      if (!isPoll) {
+        setIsVerifying(true);
+        setVerifyError(null);
+      }
 
       try {
         const nextStepIndex = await api.mfaFinishCode(
@@ -136,17 +148,28 @@ export const useMfaConnect = (
           code,
           stepAttemptId,
         );
+        setRadiusChallenge(null);
         if (isPresent(nextStepIndex)) {
           onStepAdvanced(nextStepIndex);
           return;
         }
         onConnected?.();
       } catch (err) {
+        const challenge = parseRadiusChallenge(err);
+        if (challenge) {
+          setRadiusChallenge(challenge);
+          setVerifyError(null);
+          return;
+        }
+        if (isRadiusAwaiting(err)) {
+          return;
+        }
         void error(`MFA verification failed: ${err}`);
         const message = mfaErrorMessage(err);
         if (!isInvalidCode(message) && !isServiceUnavailable(err) && !isTimeout(err)) {
           setToken(null);
           setMfaToken(null);
+          setRadiusChallenge(null);
         }
         if (isPresent(onFailure) && !isInvalidCode(message)) {
           onFailure(err);
@@ -165,7 +188,9 @@ export const useMfaConnect = (
         }
       } finally {
         verifyingRef.current = false;
-        setIsVerifying(false);
+        if (!isPoll) {
+          setIsVerifying(false);
+        }
       }
     },
     [
@@ -182,5 +207,13 @@ export const useMfaConnect = (
     ],
   );
 
-  return { token, isStarting, startError, verifyCode, isVerifying, verifyError };
+  return {
+    token,
+    isStarting,
+    startError,
+    verifyCode,
+    isVerifying,
+    verifyError,
+    radiusChallenge,
+  };
 };

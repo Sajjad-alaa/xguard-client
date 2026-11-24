@@ -18,6 +18,7 @@ import { LocationCardMfaEmailView } from './views/LocationCardMfaEmailView/Locat
 import { LocationCardMfaFido2View } from './views/LocationCardMfaFido2View/LocationCardMfaFido2View';
 import { LocationCardMfaMobileView } from './views/LocationCardMfaMobileView/LocationCardMfaMobileView';
 import { LocationCardMfaOidcView } from './views/LocationCardMfaOidcView/LocationCardMfaOidcView';
+import { LocationCardMfaRadiusView } from './views/LocationCardMfaRadiusView/LocationCardMfaRadiusView';
 import { LocationCardMfaSettings } from './views/LocationCardMfaSettings/LocationCardMfaSettings';
 import { LocationCardMfaTotpView } from './views/LocationCardMfaTotpView/LocationCardMfaTotpView';
 import { LocationCardPostureCheckFailView } from './views/LocationCardPostureCheckFailView/LocationCardPostureCheckFailView';
@@ -37,6 +38,7 @@ const views: Record<LocationCardViewsValue, ReactNode> = {
   [LocationCardViews.MfaOidc]: <LocationCardMfaOidcView />,
   [LocationCardViews.MfaMobile]: <LocationCardMfaMobileView />,
   [LocationCardViews.MfaFido2]: <LocationCardMfaFido2View />,
+  [LocationCardViews.MfaRadius]: <LocationCardMfaRadiusView />,
   [LocationCardViews.MfaSettings]: <LocationCardMfaSettings />,
   [LocationCardViews.Connecting]: null,
   [LocationCardViews.Connected]: <ConnectedView />,

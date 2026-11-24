@@ -21,6 +21,7 @@ import { ConnectModalMfaEmail } from './views/ConnectModalMfaEmail/ConnectModalM
 import { ConnectModalMfaFido2 } from './views/ConnectModalMfaFido2/ConnectModalMfaFido2';
 import { ConnectModalMfaMobile } from './views/ConnectModalMfaMobile/ConnectModalMfaMobile';
 import { ConnectModalMfaOidc } from './views/ConnectModalMfaOidc/ConnectModalMfaOidc';
+import { ConnectModalMfaRadius } from './views/ConnectModalMfaRadius/ConnectModalMfaRadius';
 import { ConnectModalMfaSettings } from './views/ConnectModalMfaSettings/ConnectModalMfaSettings';
 import { ConnectModalMfaTotp } from './views/ConnectModalMfaTotp/ConnectModalMfaTotp';
 import { ConnectModalPostureCheckFail } from './views/ConnectModalPostureCheckFail/ConnectModalPostureCheckFail';
@@ -73,6 +74,7 @@ const viewContent: Record<ConnectModalViewValue, ReactNode> = {
   [ConnectModalView.MfaOidc]: <ConnectModalMfaOidc />,
   [ConnectModalView.MfaMobile]: <ConnectModalMfaMobile />,
   [ConnectModalView.MfaFido2]: <ConnectModalMfaFido2 />,
+  [ConnectModalView.MfaRadius]: <ConnectModalMfaRadius />,
   [ConnectModalView.MfaSettings]: <ConnectModalMfaSettings />,
   [ConnectModalView.PostureCheckFail]: <ConnectModalPostureCheckFail />,
   [ConnectModalView.ConnectionError]: <ConnectModalConnectionError />,
