@@ -97,7 +97,7 @@ edition = "2021"
 homepage = "https://github.com/Sajjad-alaa/xguard-client"
 license-file = "../LICENSE.md"
 rust-version = "1.95"
-version = "2.2.0"
+version = "2.3.0"
 
 [package]
 name = "xguard-client"
